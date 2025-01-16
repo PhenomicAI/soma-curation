@@ -1,0 +1,19 @@
+site_name: Data Curation
+theme:
+  name: material
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          rendering:
+            show_source: true
+  - mkdocs-jupyter:
+      execute: false
+nav:
+  - Home: index.md
+  - Usage:
+      - SomaData: usage/soma_basics.py
+  - API Reference:
+      - SomaData: api_reference/atlas.md
+      - Get Functions: api_reference/dataset.md
