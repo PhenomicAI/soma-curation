@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "data_curation"
+name = "soma_curation"
 version = "0.0.1"
 description = "Curate data for the scTx platform"
 authors = [
@@ -32,6 +32,11 @@ dependencies = [
     "gitpython",
     "s3fs[boto3]",
     "s3pathlib"
+]
+
+[tool.setuptools.package-data]
+"soma_curation.constants" = [
+  "dummy_core_geneset.tsv.gz"
 ]
 
 [project.scripts]

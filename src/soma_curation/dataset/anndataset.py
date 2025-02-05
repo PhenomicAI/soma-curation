@@ -4,9 +4,11 @@ import scipy.sparse as sp
 import pyarrow as pa
 import pandas as pd
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from typing_extensions import Self
 from pydantic import BaseModel, ConfigDict, model_validator, Field, computed_field
+from pathlib import Path
+from s3pathlib import S3Path
 
 from ..schema import DatabaseSchema
 from ..sc_logging import logger
@@ -263,3 +265,22 @@ class AnnDataset(BaseModel):
         presence_matrix[:, index] = 1
 
         return presence_matrix.tocoo()
+
+    def write(self, output_filepath: Union[str, Path, S3Path]):
+
+        # TODO: method to deal with string path logic
+        if isinstance(output_filepath, str):
+            if output_filepath.startswith("s3://"):
+                output_filepath = S3Path(output_filepath)
+            else:
+                output_filepath = Path(output_filepath)
+
+        logger.info(f"Saving AnnData as H5AD to {output_filepath}...")
+        if isinstance(output_filepath, Path):
+            self.artifact.write_h5ad(filename=output_filepath, compression="gzip")
+        elif isinstance(output_filepath, S3Path):
+            temp_path = Path(f"/tmp/{output_filepath.basename}")
+            self.artifact.write_h5ad(filename=temp_path, compression="gzip")
+            output_filepath.upload_file(temp_path, overwrite=True)
+
+        return output_filepath

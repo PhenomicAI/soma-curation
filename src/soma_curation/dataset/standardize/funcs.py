@@ -74,7 +74,7 @@ def compute_pct_mito(adata: ad.AnnData) -> npt.NDArray[np.float64]:
     """
     logger.info("Computing pct mito...")
     mito_mask = adata.var["gene"].str.startswith("MT-")
-    return np.asarray((adata.X[:, mito_mask].sum(axis=1) / adata.X.sum(axis=1)).flatten() * 100).flatten()
+    return np.asarray((adata[:, mito_mask].X.sum(axis=1) / adata.X.sum(axis=1)).flatten() * 100).flatten()
 
 
 def compute_pct_ribo(adata: ad.AnnData) -> npt.NDArray[np.float64]:
@@ -91,7 +91,7 @@ def compute_pct_ribo(adata: ad.AnnData) -> npt.NDArray[np.float64]:
     """
     logger.info("Computing pct ribo...")
     ribo_mask = adata.var["gene"].str.startswith(("RPS", "RPL"))
-    return np.asarray((adata.X[:, ribo_mask].sum(axis=1) / adata.X.sum(axis=1)).flatten() * 100).flatten()
+    return np.asarray((adata[:, ribo_mask].X.sum(axis=1) / adata.X.sum(axis=1)).flatten() * 100).flatten()
 
 
 def get_main_gene_name_from_2_pd_cols(

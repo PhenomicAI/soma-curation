@@ -4,14 +4,24 @@ import tiledbsoma.io
 import tiledbsoma as soma
 
 from datetime import datetime, timezone
-from pydantic import BaseModel, Field, computed_field, ConfigDict
+from pydantic import BaseModel, Field, computed_field, ConfigDict, AfterValidator
 from pathlib import Path
-from typing import List
+from typing import List, Union
+from typing_extensions import Annotated
 
 from ..schema import DatabaseSchema, SOMA_TileDB_Context
 from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
 from ..dataset.anndataset import AnnDataset
+
+
+def expand_paths(value: Union[str, Path]) -> Path:
+    if isinstance(value, str):
+        value = Path(value)
+    return value.expanduser()
+
+
+ExpandedPath = Annotated[str, AfterValidator(expand_paths)]
 
 
 class AtlasManager(BaseModel):
@@ -37,7 +47,7 @@ class AtlasManager(BaseModel):
     """
 
     atlas_name: str
-    storage_directory: Path
+    storage_directory: ExpandedPath
     globals_: DatabaseSchema = Field(repr=False)
     context: soma.SOMATileDBContext = Field(default_factory=SOMA_TileDB_Context, repr=False)
 
@@ -53,7 +63,7 @@ class AtlasManager(BaseModel):
         - Path
             The path to the experiment directory.
         """
-        return (self.storage_directory / self.atlas_name).expanduser()
+        return self.storage_directory / self.atlas_name
 
     @computed_field(repr=True)
     @property
@@ -83,7 +93,11 @@ class AtlasManager(BaseModel):
             True if the atlas exists, False otherwise.
         """
         if self.experiment_path.exists():
-            return True
+            try:
+                soma.Experiment.open(self.experiment_path)
+                return True
+            except Exception:
+                return False
         return False
 
     def create(self) -> None:
@@ -98,8 +112,8 @@ class AtlasManager(BaseModel):
             )
             return None
         else:
-            if not self.storage_directory.exists():
-                self.storage_directory.mkdir()
+            if not self.storage_directory.expanduser().exists():
+                self.storage_directory.expanduser().mkdir()
         logger.info(f"Creating atlas {self.atlas_name} in directory {self.storage_directory}...")
 
         with soma.Experiment.create(self.experiment_path.as_posix(), context=self.context) as experiment:

@@ -13,7 +13,7 @@ plugins:
 nav:
   - Home: index.md
   - Usage:
-      - SomaData: usage/soma_basics.py
+      - Getting Started: usage/basics.py
   - API Reference:
-      - SomaData: api_reference/atlas.md
-      - Get Functions: api_reference/dataset.md
+      - Atlas: api_reference/atlas.md
+      - Dataset: api_reference/dataset.md

@@ -20,16 +20,16 @@
 # !pip install data_curation
 
 # +
-import data_curation.logging
-from data_curation.soma.schema import get_schema
-from data_curation.soma.atlas.crud import AtlasManager
-from data_curation.soma.dataset.anndataset import AnnDataset
+import soma_curation.sc_logging as lg
+from soma_curation.schema import get_schema
+from soma_curation.atlas.crud import AtlasManager
+from soma_curation.dataset.anndataset import AnnDataset
 
 # Set the log level to info
-data_curation.logging.info()
+lg.info()
 # -
 
-db_schema = get_schema("human")
+db_schema = get_schema()
 
 am = AtlasManager(atlas_name="human", globals_=db_schema, storage_directory="~/data_curation")
 am.create()
@@ -65,9 +65,3 @@ dataset = AnnDataset(artifact=anndata, database_schema=db_schema)
 dataset.standardize()
 
 am.append_anndatasets([dataset])
-
-
-
-
-
-

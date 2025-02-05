@@ -9,6 +9,8 @@ from functools import cached_property
 from pydantic import BaseModel, ConfigDict, validate_call, Field, computed_field
 from typing import Dict, Any, Literal, List, Set
 
+from .sc_logging import logger
+
 
 DEFAULT_TILEDB_CONFIG = {
     "py.max_incomplete_retries": 100,
@@ -219,7 +221,7 @@ REQUIRED_OBS_COLUMNS:
     - study_name 
 REQUIRED_VAR_COLUMNS: 
     - gene
-GENE_INTERSECTION_THRESHOLD_FRAC: 0.5
+GENE_INTERSECTION_THRESHOLD_FRAC: 0.1
 """
 
 
@@ -344,8 +346,9 @@ class DatabaseSchema(BaseModel):
         """
         Fetch and set functions for computed columns from the specified module.
         """
+        module = importlib.import_module(".dataset.standardize", package=__package__)
+
         for col in self.PAI_OBS_COMPUTED_COLUMNS:
-            module = importlib.import_module("data_curation.soma.dataset.standardize")
             func = getattr(module, self.COMPUTED_COLUMN_FUNCTIONS[col])
 
             self.COMPUTED_COLUMN_FUNCTIONS[col] = func
@@ -546,7 +549,7 @@ def get_validation_schema() -> ValidationSchema:
     - ValidationSchema
         The validation schema object.
     """
-    return ValidationSchema(**sample_validation_schema)
+    return ValidationSchema(**read_yaml(sample_validation_schema))
 
 
 @validate_call
@@ -561,4 +564,14 @@ def get_schema() -> DatabaseSchema:
     dict_ = read_globals_yaml(sample_global_config)
     validation_schema = get_validation_schema()
     dict_["VALIDATION_SCHEMA"] = validation_schema
+
+    user_core_path = dict_.get("CORE_GENE_SET_PATH")
+
+    # For demo-purposes, we want it to work out the box
+    # sometimes use core path will be null and so we just warn users and use a dummy gene list
+    if user_core_path is None:
+        logger.warning("CORE_GENE_SET_PATH is null or missing. Using dummy_core_geneset.tsv.gz instead.")
+        core_gene_set_path = importlib.resources.files("soma_curation.constants").joinpath("dummy_core_geneset.tsv.gz")
+        dict_["CORE_GENE_SET_PATH"] = str(core_gene_set_path)
+
     return DatabaseSchema(**dict_)
