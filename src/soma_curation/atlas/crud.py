@@ -6,7 +6,8 @@ import tiledbsoma as soma
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, computed_field, ConfigDict, AfterValidator
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Generator
+from contextlib import contextmanager
 from typing_extensions import Annotated
 
 from ..schema import DatabaseSchema, SOMA_TileDB_Context
@@ -76,13 +77,17 @@ class AtlasManager(BaseModel):
             The path to the experiment directory.
         """
         if self.exists():
-            with soma.Experiment.open(self.experiment_path.as_posix(), context=self.context) as exp:
+            with self.open(mode="r") as exp:
                 if "pai_soma_object_version" in exp.metadata:
                     return exp.metadata["pai_soma_object_version"]
                 else:
                     return "v1.0"
         else:
             return "v1.0"
+
+    @contextmanager
+    def open(self, **kwargs) -> Generator[soma.Experiment, None, None]:
+        yield soma.Experiment.open(self.experiment_path.as_posix(), context=self.context, **kwargs)
 
     def exists(self) -> bool:
         """
@@ -94,9 +99,12 @@ class AtlasManager(BaseModel):
         """
         if self.experiment_path.exists():
             try:
-                soma.Experiment.open(self.experiment_path)
+                self.open(mode="r")
                 return True
-            except Exception:
+            except soma._exception.DoesNotExistError:
+                return False
+            except Exception as e:
+                logger.critical("Unexpected error occured", e)
                 return False
         return False
 
@@ -161,6 +169,7 @@ class AtlasManager(BaseModel):
                 schema=var_schema,
                 index_column_names=list(self.globals_.PAI_VAR_INDEX_COLUMNS.keys()),
                 platform_config=self.globals_.PAI_VAR_PLATFORM_CONFIG,
+                domain=[[0, len(self.globals_.VAR_DF) - 1]],
             )
 
             # TODO: clean this little issue here
