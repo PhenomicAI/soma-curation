@@ -14,6 +14,7 @@ from ..schema import DatabaseSchema, SOMA_TileDB_Context
 from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
 from ..dataset.anndataset import AnnDataset
+from .ingestion_funcs import _create_registration_mapping
 
 
 def expand_paths(value: Union[str, Path]) -> Path:
@@ -224,6 +225,16 @@ class AtlasManager(BaseModel):
         """
         pass
 
+    def create_registration_mapping(self, h5ad_paths: List[str]) -> tiledbsoma.io.ExperimentAmbientLabelMapping:
+        return _create_registration_mapping(
+            experiment_uri=self.experiment_path.as_posix(),
+            filenames=h5ad_paths,
+            measurement_name=self.globals_.MEASUREMENT_RNA_NAME,
+            obs_field_name="barcode",
+            var_field_name="gene",
+            context=self.context,
+        )
+
     def append_anndatasets(self, datasets: List[AnnDataset]) -> None:
         """
         Append anndatas to the atlas.
@@ -236,13 +247,7 @@ class AtlasManager(BaseModel):
             raise ValueError("All datasets need to be standardized by running dataset.standardize()")
 
         logger.info(f"Registering {len(datasets)} AnnDatasets for ingestion...")
-        rm = tiledbsoma.io.register_anndatas(
-            experiment_uri=self.experiment_path.as_posix(),
-            adatas=[x.artifact for x in datasets],
-            measurement_name=self.globals_.MEASUREMENT_RNA_NAME,
-            obs_field_name="barcode",
-            var_field_name="gene",
-        )
+
         logger.info("Beginning ingestion into SOMA...")
         for idx, dataset in enumerate(datasets):
             logger.info(f"Ingesting dataset {idx + 1}/{len(datasets)}: {dataset}")
