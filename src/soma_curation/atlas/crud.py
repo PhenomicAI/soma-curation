@@ -247,20 +247,12 @@ class AtlasManager(BaseModel):
         for idx, dataset in enumerate(datasets):
             logger.info(f"Ingesting dataset {idx + 1}/{len(datasets)}: {dataset}")
 
-            # Feature presence
-            presence_matrix = dataset._generate_feature_presence()
-            with soma.Experiment.open(self.experiment_path.as_posix(), mode="r", context=self.context) as exp:
-                if exp.obs.non_empty_domain() == ((0, 0),):
-                    last_sample_idx = 0
-                else:
-                    last_sample_idx = (
-                        exp.obs.read(coords=([exp.obs.count - 1],), column_names=["sample_name"])
-                        .concat()
-                        .to_pandas()["sample_name"]
-                        .cat.codes[0]
-                    ) + 1
+            logger.info("Resizing experiment...")
+            tiledbsoma.io.resize_experiment(
+                uri=self.experiment_path.as_posix(), nobs=rm.get_obs_shape(), nvars=rm.get_var_shapes()
+            )
 
-            logger.info("Ingesting rest of AnnData into SOMA...")
+            logger.info("Ingesting AnnData into SOMA...")
             tiledbsoma.io.from_anndata(
                 experiment_uri=self.experiment_path.as_posix(),
                 anndata=dataset.artifact,
@@ -272,15 +264,3 @@ class AtlasManager(BaseModel):
                 raw_X_layer_name="row_raw",
                 context=self.context,
             )
-
-            logger.info("Ingesting feature presence matrix into SOMA...")
-            with soma.Experiment.open(self.experiment_path.as_posix(), mode="w", context=self.context) as exp:
-                exp.ms["RNA"][self.globals_.PAI_PRESENCE_MATRIX_NAME].write(
-                    pa.Table.from_pydict(
-                        {
-                            "soma_dim_0": presence_matrix.row + last_sample_idx,
-                            "soma_dim_1": presence_matrix.col,
-                            "soma_data": presence_matrix.data,
-                        }
-                    )
-                )
