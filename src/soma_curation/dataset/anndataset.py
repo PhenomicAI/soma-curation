@@ -266,7 +266,15 @@ class AnnDataset(BaseModel):
 
         return presence_matrix.tocoo()
 
-    def write(self, output_filepath: Union[str, Path, S3Path]):
+    def write(self, output_filepath: Union[str, Path, S3Path]) -> Union[Path, S3Path]:
+        """Write the AnnDataset to H5AD format at a specific filepath
+
+        Args:
+            output_filepath (Union[str, Path, S3Path]): Needs to end with `.h5ad`
+
+        Returns:
+            Union[Path, S3Path]: Location of written H5AD object
+        """
 
         # TODO: method to deal with string path logic
         if isinstance(output_filepath, str):
@@ -275,7 +283,14 @@ class AnnDataset(BaseModel):
             else:
                 output_filepath = Path(output_filepath)
 
+        if output_filepath.suffix != ".h5ad":
+            raise ValueError("Please ensure the output filepath is a H5AD path i.e. ends with the `.h5ad` extension.")
+
         logger.info(f"Saving AnnData as H5AD to {output_filepath}...")
+        output_filepath.parent.mkdir(exist_ok=True)
+        if output_filepath.exists():
+            logger.info(f"H5AD exists at {output_filepath.as_posix()}, overwriting...")
+
         if isinstance(output_filepath, Path):
             self.artifact.write_h5ad(filename=output_filepath, compression="gzip")
         elif isinstance(output_filepath, S3Path):
