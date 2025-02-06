@@ -24,6 +24,7 @@ import soma_curation.sc_logging as lg
 from soma_curation.schema import get_schema
 from soma_curation.atlas.crud import AtlasManager
 from soma_curation.dataset.anndataset import AnnDataset
+from soma_curation.constants.constants import dummy_anndata
 
 # Set the log level to info
 lg.info()
@@ -37,24 +38,12 @@ am.create()
 
 # +
 # Assuming that you fetch a cool dataset from somewhere
-import scanpy as sc
-
-anndata = sc.datasets.pbmc3k()
+anndata = dummy_anndata()
 # -
 
-# Create a Phenomic dataset using our schema
-# You should get an error in this case, since the schema does not allow this
-# In this case, we're missing sample_name, disease_name, study_name, gene columns
-dataset = AnnDataset(artifact=anndata, database_schema=db_schema)
-
-# Fixing issues
-anndata.obs["sample_name"] = "sample"
-anndata.obs["study_name"] = "study"
-anndata.obs["disease_name"] = "disease"
-anndata.var["gene"] = anndata.var.index
-anndata.obs["barcode"] = anndata.obs.index
-
-# You met the basic criteria. Great success!
+# Create a Phenomic dataset using our schema, errors will pop up
+# if this dataset does not follow the schema specified in
+# db_schema.VALIDATION_SCHEMA
 dataset = AnnDataset(artifact=anndata, database_schema=db_schema)
 
 # Standardize the columns
