@@ -225,7 +225,7 @@ class AtlasManager(BaseModel):
         """
         pass
 
-    def create_registration_mapping(self, h5ad_paths: List[str]) -> tiledbsoma.io.ExperimentAmbientLabelMapping:
+    def create_registration_mapping_h5ads(self, h5ad_paths: List[str]) -> tiledbsoma.io.ExperimentAmbientLabelMapping:
         return _create_registration_mapping(
             experiment_uri=self.experiment_path.as_posix(),
             filenames=h5ad_paths,
@@ -234,38 +234,3 @@ class AtlasManager(BaseModel):
             var_field_name="gene",
             context=self.context,
         )
-
-    def append_anndatasets(self, datasets: List[AnnDataset]) -> None:
-        """
-        Append anndatas to the atlas.
-
-        This method is not yet implemented.
-        """
-        if not all(isinstance(item, AnnDataset) for item in datasets):
-            raise ValueError("All datasets need to be of the same type `AnnDataset`")
-        if not all(item.standardized for item in datasets):
-            raise ValueError("All datasets need to be standardized by running dataset.standardize()")
-
-        logger.info(f"Registering {len(datasets)} AnnDatasets for ingestion...")
-
-        logger.info("Beginning ingestion into SOMA...")
-        for idx, dataset in enumerate(datasets):
-            logger.info(f"Ingesting dataset {idx + 1}/{len(datasets)}: {dataset}")
-
-            logger.info("Resizing experiment...")
-            tiledbsoma.io.resize_experiment(
-                uri=self.experiment_path.as_posix(), nobs=rm.get_obs_shape(), nvars=rm.get_var_shapes()
-            )
-
-            logger.info("Ingesting AnnData into SOMA...")
-            tiledbsoma.io.from_anndata(
-                experiment_uri=self.experiment_path.as_posix(),
-                anndata=dataset.artifact,
-                measurement_name=self.globals_.MEASUREMENT_RNA_NAME,
-                registration_mapping=rm,
-                obs_id_name="barcode",
-                var_id_name="gene",
-                X_layer_name="row_raw",
-                raw_X_layer_name="row_raw",
-                context=self.context,
-            )
