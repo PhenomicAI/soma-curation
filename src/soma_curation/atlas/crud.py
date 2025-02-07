@@ -216,21 +216,3 @@ class AtlasManager(BaseModel):
             logger.info(
                 f"Atlas {self.atlas_name} does not exist in directory {self.storage_directory}, skipping deletion..."
             )
-
-    def update(self, dataset: AnnDataset) -> None:
-        """
-        Update the atlas with a new dataset.
-
-        This method is not yet implemented.
-        """
-        pass
-
-    def create_registration_mapping_h5ads(self, h5ad_paths: List[str]) -> tiledbsoma.io.ExperimentAmbientLabelMapping:
-        return _create_registration_mapping(
-            experiment_uri=self.experiment_path.as_posix(),
-            filenames=h5ad_paths,
-            measurement_name=self.globals_.MEASUREMENT_RNA_NAME,
-            obs_field_name="barcode",
-            var_field_name="gene",
-            context=self.context,
-        )
