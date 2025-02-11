@@ -287,7 +287,8 @@ class AnnDataset(BaseModel):
             raise ValueError("Please ensure the output filepath is a H5AD path i.e. ends with the `.h5ad` extension.")
 
         logger.info(f"Saving AnnData as H5AD to {output_filepath}...")
-        output_filepath.parent.mkdir(exist_ok=True)
+        output_filepath.parent.mkdir(parents=True, exist_ok=True)
+
         if output_filepath.exists():
             logger.info(f"H5AD exists at {output_filepath.as_posix()}, overwriting...")
 

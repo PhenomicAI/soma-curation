@@ -1,20 +1,17 @@
 import pyarrow as pa
 import shutil
-import tiledbsoma.io
 import tiledbsoma as soma
 
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, computed_field, ConfigDict, AfterValidator
 from pathlib import Path
-from typing import List, Union, Generator
+from typing import Union, Generator
 from contextlib import contextmanager
 from typing_extensions import Annotated
 
 from ..schema import DatabaseSchema, SOMA_TileDB_Context
 from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
-from ..dataset.anndataset import AnnDataset
-from .ingestion_funcs import _create_registration_mapping
 
 
 def expand_paths(value: Union[str, Path]) -> Path:
@@ -28,7 +25,7 @@ ExpandedPath = Annotated[str, AfterValidator(expand_paths)]
 
 class AtlasManager(BaseModel):
     """
-    AtlasManager class is designed to manage the creation, deletion, and manipulation of single-cell RNA sequencing atlases.
+    AtlasManager class is designed to manage the creation, deletion, and schema management for single-cell RNA sequencing atlases.
 
     Attributes:
     - atlas_name: str
@@ -44,8 +41,6 @@ class AtlasManager(BaseModel):
     - exists: Checks if the atlas already exists.
     - create: Creates a new atlas.
     - delete: Deletes an existing atlas.
-    - update: Updates the atlas with a new dataset (not yet implemented).
-    - append: Appends a dataset to the atlas (not yet implemented).
     """
 
     atlas_name: str
