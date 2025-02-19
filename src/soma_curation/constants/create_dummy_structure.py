@@ -39,8 +39,18 @@ def create_mtx_files(sample_path: Path, barcodes: List[str]):
     Create a dummy matrix file (in Matrix Market format, gzipped), along with
     corresponding barcodes and features files.
     """
+    # Write features.tsv.gz (dummy gene features)
+    features = pd.DataFrame({"feature": ["A", "B", "D"], "gene": ["A", "B", "D"]})
+    features.to_csv(
+        sample_path / "features.tsv.gz",
+        sep="\t",
+        index=False,
+        header=False,
+        compression="gzip",
+    )
+
     # Create a 3x3 sparse matrix as a dummy matrix.
-    matrix = coo_matrix(np.array([[1, 0, 0], [0, 1, 1], [1, 1, 0]]))
+    matrix = coo_matrix(np.ones((len(features), len(barcodes))))
     matrix_file = sample_path / "matrix.mtx.gz"
     with gzip.open(matrix_file, "wb") as f:
         mmwrite(f, matrix)
@@ -49,16 +59,6 @@ def create_mtx_files(sample_path: Path, barcodes: List[str]):
     barcodes_df = pd.DataFrame({"barcode": barcodes})
     barcodes_df.to_csv(
         sample_path / "barcodes.tsv.gz",
-        sep="\t",
-        index=False,
-        header=False,
-        compression="gzip",
-    )
-
-    # Write features.tsv.gz (dummy gene features)
-    features = pd.DataFrame({"feature": ["A", "B", "C"], "gene": ["D", "A", "G"]})
-    features.to_csv(
-        sample_path / "features.tsv.gz",
         sep="\t",
         index=False,
         header=False,

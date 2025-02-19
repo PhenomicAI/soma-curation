@@ -27,6 +27,25 @@ def _create_registration_mapping(
     return rm
 
 
+def _resize_experiment(
+    experiment_uri: str,
+    registration_mapping: tiledbsoma.io.ExperimentAmbientLabelMapping,
+    context: tiledbsoma.SOMATileDBContext = SOMA_TileDB_Context(),
+) -> tiledbsoma.io.ExperimentAmbientLabelMapping:
+    try:
+        tiledbsoma.io.resize_experiment(
+            uri=experiment_uri,
+            nobs=registration_mapping.get_obs_shape(),
+            nvars=registration_mapping.get_var_shapes(),
+            context=context,
+        )
+
+        return True
+    except Exception:
+        logger.warning("Resize experiment failed")
+        raise ValueError("Resize experiment failed")
+
+
 def _ingest_h5ad_worker(
     experiment_uri: str,
     h5ad_path: str,
@@ -40,10 +59,6 @@ def _ingest_h5ad_worker(
 ) -> bool:
     try:
         logger.info(f"Worker ingesting file: {h5ad_path}")
-
-        tiledbsoma.io.resize_experiment(
-            uri=experiment_uri, nobs=registration_mapping.get_obs_shape(), nvars=registration_mapping.get_var_shapes()
-        )
 
         tiledbsoma.io.from_h5ad(
             experiment_uri=experiment_uri,
