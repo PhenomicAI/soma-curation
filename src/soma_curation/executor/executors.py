@@ -49,20 +49,6 @@ class ExecutorBase(abc.ABC):
         pass
 
 
-class SerialExecutor(ExecutorBase):
-    """Run tasks in a simple for-loop, catching errors for each task."""
-
-    def run(self, tasks: List[Any], func: Callable[[Any], T]) -> ExecutionResult[T]:
-        result = ExecutionResult[T]()
-        for task in tasks:
-            try:
-                output = func(task)
-                result.successes.append(output)
-            except Exception as exc:
-                result.failures.append((task, exc))
-        return result
-
-
 class MultiprocessingExecutor(ExecutorBase):
     """Run tasks in parallel using ProcessPoolExecutor and capture errors gracefully."""
 
