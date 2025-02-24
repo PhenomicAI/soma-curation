@@ -1,19 +1,15 @@
-# executor.py
 import abc
 import concurrent.futures
 from typing import Any, List, Callable, Tuple, TypeVar, Generic
 
-# A generic type variable for our task results
+from ..sc_logging import init_worker_logging
+
 T = TypeVar("T")
 
 
 class ExecutionResult(Generic[T]):
     """
     Holds the outcome of executing tasks.
-
-    Attributes:
-        successes (List[T]): The list of task outputs that completed successfully.
-        failures (List[Tuple[Any, Exception]]): A list of tuples, each containing the task input and the exception raised.
     """
 
     def __init__(self) -> None:
@@ -22,7 +18,6 @@ class ExecutionResult(Generic[T]):
 
     @property
     def all_successful(self) -> bool:
-        """Return True if no task has failed."""
         return len(self.failures) == 0
 
     @property
@@ -41,25 +36,35 @@ class ExecutorBase(abc.ABC):
     """Abstract base class for concurrency executors."""
 
     @abc.abstractmethod
-    def run(self, tasks: List[Any], func: Callable[[Any], T]) -> ExecutionResult[T]:
-        """
-        Execute `func` on each element of `tasks` and return an ExecutionResult that
-        includes both successes and failures.
-        """
+    def run(self, tasks: List[Any], func: Callable[..., T]) -> ExecutionResult[T]:
         pass
 
 
 class MultiprocessingExecutor(ExecutorBase):
-    """Run tasks in parallel using ProcessPoolExecutor and capture errors gracefully."""
+    """
+    Run tasks in parallel using ProcessPoolExecutor, capturing errors gracefully.
+    Optionally takes an `initializer` function (plus `initargs`) that is invoked
+    *once* in each worker process before it starts running tasks.
+    """
 
-    def __init__(self, processes: int = 4):
+    def __init__(
+        self,
+        processes: int = 4,
+        init_worker_logging: Callable[[str, str], None] = init_worker_logging,
+        init_args: Tuple[str] = (),
+    ):
         self.processes = processes
+        self.init_worker_logging = init_worker_logging
+        self.init_args = init_args
 
-    def run(self, tasks: List[Any], func: Callable[[Any], T]) -> ExecutionResult[T]:
+    def run(self, tasks: Tuple[Any], func: Callable[..., T]) -> ExecutionResult[T]:
         result = ExecutionResult[T]()
-        # Use ProcessPoolExecutor to submit tasks in parallel.
-        with concurrent.futures.ProcessPoolExecutor(max_workers=self.processes) as executor:
-            future_to_task = {executor.submit(func, task): task for task in tasks}
+        if isinstance(tasks[0], str):
+            raise ValueError("Tasks need to be tuples!")
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=self.processes, initializer=self.init_worker_logging, initargs=self.init_args
+        ) as executor:
+            future_to_task = {executor.submit(func, *task): task for task in tasks}
             for future in concurrent.futures.as_completed(future_to_task):
                 task = future_to_task[future]
                 try:
@@ -67,4 +72,5 @@ class MultiprocessingExecutor(ExecutorBase):
                     result.successes.append(output)
                 except Exception as exc:
                     result.failures.append((task, exc))
+
         return result

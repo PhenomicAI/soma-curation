@@ -3,19 +3,17 @@ import sys
 import pickle
 from pathlib import Path
 
-
-from ..schema import get_schema
-from ..sc_logging import logger, _set_level
+from ..sc_logging import logger, _set_level, init_worker_logging
 from ..constants import create_dummy_structure
 from ..ingest.ingestion_funcs import (
-    _create_registration_mapping,
-    _ingest_h5ad_worker,
-    _resize_experiment,
+    create_registration_mapping,
+    ingest_h5ad_soma,
+    resize_experiment,
+    convert_and_std_mtx_to_h5ad,
 )
 from ..atlas.crud import AtlasManager
-from ..dataset.anndataset import AnnDataset
-from ..mtx_collection.mtx_collection import MtxCollection
 from ..executor.executors import MultiprocessingExecutor
+from ..config.config import PipelineConfig
 
 
 def main():
@@ -33,21 +31,23 @@ def main():
     # 1) Create a dummy structure for the raw data (if needed).
     create_dummy_structure(args.raw_storage_dir)
 
+    pc = PipelineConfig(
+        atlas_name=args.atlas_name,
+        raw_storage_dir=args.raw_storage_dir,
+        h5ad_storage_dir=args.h5ad_storage_dir,
+        atlas_storage_dir=args.atlas_storage_dir,
+        processes=args.processes,
+    )
+
     # 2) Set up logging. We create a logs directory inside the atlas directory.
-    log_dir = Path(args.atlas_storage_dir) / "logs"
+    log_dir = Path(pc.atlas_storage_dir) / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    _set_level(level=20, add_file_handler=True, log_dir=log_dir, log_file=f"{args.atlas_name}.log")
+    _set_level(level=10, add_file_handler=True, log_dir=log_dir, log_file=f"{pc.atlas_name}.log")
 
     logger.info("Starting pipeline execution...")
 
-    # 3) Get the database schema
-    db_schema = get_schema()
-
-    # 4) Initialize MtxCollection
-    mtx_collection = MtxCollection(storage_directory=args.raw_storage_dir, db_schema=db_schema, include=None)
-
     # 5) Initialize AtlasManager
-    am = AtlasManager(atlas_name=args.atlas_name, storage_directory=args.atlas_storage_dir, globals_=db_schema)
+    am = AtlasManager(atlas_name=pc.atlas_name, storage_directory=pc.atlas_storage_dir, globals_=pc.db_schema)
 
     if am.exists():
         raise ValueError(f"Atlas '{args.atlas_name}' already exists, aborting.")
@@ -59,36 +59,19 @@ def main():
     # Collect tasks: each item is (study, sample) so we can handle them
     # in parallel using the executor below.
     tasks_to_convert = []
-    for study in mtx_collection.list_studies():
-        for sample in mtx_collection.list_samples(study_name=study):
-            tasks_to_convert.append((study, sample))
-
-    def convert_to_h5ad(task):
-        """
-        Function to convert a single (study, sample) to an H5AD file.
-        Returns the path to the resulting H5AD file on success.
-        Raises an exception if anything fails.
-        """
-        study, sample = task
-        try:
-            logger.info(f"[convert_to_h5ad] Processing study={study}, sample={sample}")
-            adata = mtx_collection.get_anndata(study_name=study, sample_name=sample)
-            anndataset = AnnDataset(artifact=adata, database_schema=db_schema)
-            anndataset.standardize()
-            # Construct the output filename
-            filename = Path(args.h5ad_storage_dir) / f"{study}-{sample}.h5ad"
-            anndataset.write(filename)
-            logger.info(f"Successfully converted {study}-{sample} -> {filename}")
-            return filename.as_posix()
-        except Exception as e:
-            logger.error(f"Error converting study={study}, sample={sample} to H5AD: {e}")
-            # Raise so that it goes to the executor's failure list
-            raise
+    for study in pc.mtx_collection.list_studies():
+        for sample in pc.mtx_collection.list_samples(study_name=study):
+            tasks_to_convert.append((study, sample, pc))
+            logger.info(f"Adding {(study, sample)} to the multiprocessing queue.")
 
     # Create a multiprocessing executor with the specified number of processes
-    mp_executor = MultiprocessingExecutor(processes=args.processes)
+    mp_executor = MultiprocessingExecutor(
+        processes=args.processes,
+        init_worker_logging=init_worker_logging,
+        init_args=(10, log_dir.as_posix(), f"{pc.atlas_name}.log"),
+    )
     logger.info("Starting parallel conversion to H5AD files...")
-    convert_result = mp_executor.run(tasks_to_convert, convert_to_h5ad)
+    convert_result = mp_executor.run(tasks_to_convert, convert_and_std_mtx_to_h5ad)
 
     # Gather successful conversions for the next step
     filenames = convert_result.successes
@@ -99,13 +82,15 @@ def main():
 
     if not filenames:
         logger.error("No files were successfully converted; exiting early.")
+        logger.error("Deleting atlas and exiting.")
+        am.delete()
         sys.exit(1)
 
     # ---------------------------------------------------------------------
     # SERIAL STEP: Create registration mapping
     # ---------------------------------------------------------------------
     logger.info("Creating registration mapping (serial step)...")
-    rm = _create_registration_mapping(experiment_uri=am.experiment_path.as_posix(), filenames=filenames)
+    rm = create_registration_mapping(experiment_uri=am.experiment_path.as_posix(), filenames=filenames)
     with open("rm.pkl", "wb") as f:
         pickle.dump(rm, f)
     logger.info("Registration mapping created and saved to rm.pkl.")
@@ -116,32 +101,16 @@ def main():
     logger.info("Resizing experiment (serial step)...")
     with open("rm.pkl", "rb") as f:
         rm = pickle.load(f)
-    _resize_experiment(am.experiment_path.as_posix(), registration_mapping=rm)
+    resize_experiment(am.experiment_path.as_posix(), registration_mapping=rm)
     logger.info("Experiment resized successfully.")
 
     # ---------------------------------------------------------------------
     # PARALLEL STEP (2): Ingest H5AD files into the SOMA experiment
     # ---------------------------------------------------------------------
-    def ingest_h5ad(path):
-        """
-        Ingest a single H5AD file into the existing experiment using
-        the precomputed registration mapping.
-        """
-        try:
-            logger.info(f"[ingest_h5ad] Ingesting {path}")
-            _ingest_h5ad_worker(
-                experiment_uri=am.experiment_path.as_posix(),
-                h5ad_path=path,
-                registration_mapping=rm,
-            )
-            logger.info(f"Successfully ingested {path}")
-            return path  # Return the filename on success
-        except Exception as e:
-            logger.error(f"Failed to ingest {path}: {e}")
-            raise
 
     logger.info("Starting parallel ingestion of H5AD files into experiment...")
-    ingest_result = mp_executor.run(filenames, ingest_h5ad)
+    tasks_for_ingestion = [(fname, am.experiment_path.as_posix(), rm) for fname in filenames]
+    ingest_result = mp_executor.run(tasks_for_ingestion, ingest_h5ad_soma)
     logger.info(
         f"Ingestion complete. {ingest_result.num_successes} successes, " f"{ingest_result.num_failures} failures."
     )

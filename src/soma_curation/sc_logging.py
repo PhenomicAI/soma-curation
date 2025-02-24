@@ -91,5 +91,21 @@ def _set_level(level: int, add_file_handler: bool = False, log_dir: Path = None,
         logger.addHandler(handler)
 
 
+def init_worker_logging(log_level: int, log_dir: str, log_file: str):
+    """
+    Called once per worker process. Configures file logging with the same
+    log level, directory, and filename as the main process.
+    """
+    logger.setLevel(log_level)
+
+    # If you want a separate handler per worker, that's possible.
+    # They will all write to the same file, leading to interleaved logs.
+    log_path = Path(log_dir) / log_file
+    fh = logging.FileHandler(log_path, mode="a")
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - [pid %(process)d] %(message)s")
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+
 # Initialize logging with a default level (optional)
 configure_logging(logging.WARNING)
