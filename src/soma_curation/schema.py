@@ -22,6 +22,7 @@ DEFAULT_TILEDB_CONFIG = {
 }
 
 
+# TODO: convert to singleton to speed up (if necessary)
 def SOMA_TileDB_Context() -> soma.options.SOMATileDBContext:
     """
     Create and return a SOMA TileDB context with default configuration.

@@ -1,19 +1,17 @@
 import pyarrow as pa
 import shutil
-import tiledbsoma.io
 import tiledbsoma as soma
 
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, computed_field, ConfigDict, AfterValidator
 from pathlib import Path
-from typing import List, Union, Generator
+from typing import Union, Generator
 from contextlib import contextmanager
 from typing_extensions import Annotated
 
 from ..schema import DatabaseSchema, SOMA_TileDB_Context
 from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
-from ..dataset.anndataset import AnnDataset
 
 
 def expand_paths(value: Union[str, Path]) -> Path:
@@ -27,7 +25,7 @@ ExpandedPath = Annotated[str, AfterValidator(expand_paths)]
 
 class AtlasManager(BaseModel):
     """
-    AtlasManager class is designed to manage the creation, deletion, and manipulation of single-cell RNA sequencing atlases.
+    AtlasManager class is designed to manage the creation, deletion, and schema management for single-cell RNA sequencing atlases.
 
     Attributes:
     - atlas_name: str
@@ -43,8 +41,6 @@ class AtlasManager(BaseModel):
     - exists: Checks if the atlas already exists.
     - create: Creates a new atlas.
     - delete: Deletes an existing atlas.
-    - update: Updates the atlas with a new dataset (not yet implemented).
-    - append: Appends a dataset to the atlas (not yet implemented).
     """
 
     atlas_name: str
@@ -214,53 +210,4 @@ class AtlasManager(BaseModel):
         else:
             logger.info(
                 f"Atlas {self.atlas_name} does not exist in directory {self.storage_directory}, skipping deletion..."
-            )
-
-    def update(self, dataset: AnnDataset) -> None:
-        """
-        Update the atlas with a new dataset.
-
-        This method is not yet implemented.
-        """
-        pass
-
-    def append_anndatasets(self, datasets: List[AnnDataset]) -> None:
-        """
-        Append anndatas to the atlas.
-
-        This method is not yet implemented.
-        """
-        if not all(isinstance(item, AnnDataset) for item in datasets):
-            raise ValueError("All datasets need to be of the same type `AnnDataset`")
-        if not all(item.standardized for item in datasets):
-            raise ValueError("All datasets need to be standardized by running dataset.standardize()")
-
-        logger.info(f"Registering {len(datasets)} AnnDatasets for ingestion...")
-        rm = tiledbsoma.io.register_anndatas(
-            experiment_uri=self.experiment_path.as_posix(),
-            adatas=[x.artifact for x in datasets],
-            measurement_name=self.globals_.MEASUREMENT_RNA_NAME,
-            obs_field_name="barcode",
-            var_field_name="gene",
-        )
-        logger.info("Beginning ingestion into SOMA...")
-        for idx, dataset in enumerate(datasets):
-            logger.info(f"Ingesting dataset {idx + 1}/{len(datasets)}: {dataset}")
-
-            logger.info("Resizing experiment...")
-            tiledbsoma.io.resize_experiment(
-                uri=self.experiment_path.as_posix(), nobs=rm.get_obs_shape(), nvars=rm.get_var_shapes()
-            )
-
-            logger.info("Ingesting AnnData into SOMA...")
-            tiledbsoma.io.from_anndata(
-                experiment_uri=self.experiment_path.as_posix(),
-                anndata=dataset.artifact,
-                measurement_name=self.globals_.MEASUREMENT_RNA_NAME,
-                registration_mapping=rm,
-                obs_id_name="barcode",
-                var_id_name="gene",
-                X_layer_name="row_raw",
-                raw_X_layer_name="row_raw",
-                context=self.context,
             )

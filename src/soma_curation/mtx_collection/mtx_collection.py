@@ -178,15 +178,25 @@ class MtxCollection(BaseModel):
         # Pandas does not support S3Paths atm
         # This helps eliminate the if-else for s3 versus normal posix paths
         # https://s3pathlib.readthedocs.io/en/latest/03-S3-Write-API.html#Pandas
-        with filepath.open("rb") as f:
-            df = pd.read_csv(f, **kwargs)
-
+        if isinstance(filepath, S3Path):
+            with filepath.open("rb") as f:
+                df = pd.read_csv(f, **kwargs)
+        elif isinstance(filepath, Path):
+            df = pd.read_csv(filepath, **kwargs)
+        else:
+            raise ValueError("Unsupported filepath type. Filepath needs to be s3pathlib S3Path or pathlib Path.")
         return df
 
     @staticmethod
     def mmread(filepath: Union[S3Path, Path]) -> sp.csr_matrix:
-        with filepath.open("rb") as f:
-            matrix = mmread(f).T.tocsr()
+        if isinstance(filepath, S3Path):
+            # S3Path handles .gz automatically
+            with filepath.open("rb") as f:
+                matrix = mmread(f).T.tocsr()
+        elif isinstance(filepath, Path):
+            matrix = mmread(filepath).T.tocsr()
+        else:
+            raise ValueError("Unsupported filepath type. Filepath needs to be s3pathlib S3Path or pathlib Path.")
 
         return matrix
 

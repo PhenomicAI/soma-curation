@@ -52,5 +52,3 @@ dataset = AnnDataset(artifact=anndata, database_schema=db_schema)
 # (b) Embedding and predicting cell types
 # (c) Normalizing the arrays
 dataset.standardize()
-
-am.append_anndatasets([dataset])

@@ -1,4 +1,5 @@
 import anndata as ad
+import anndata.io
 import numpy as np
 import scipy.sparse as sp
 import pyarrow as pa
@@ -225,6 +226,7 @@ class AnnDataset(BaseModel):
                 dtype = self.database_schema.PAI_VAR_TERM_COLUMNS[col].to_pandas_dtype()
                 self.artifact.var[col] = self.artifact.var[col].fillna(None)
             except Exception as e:
+                logger.debug(f"Cannot standardize col {col}: {e}")
                 dtype = "str"
                 self.artifact.var[col] = self.artifact.var[col].fillna("").astype(dtype)
         self.artifact = self.artifact[:, self.artifact.var["gene"].isin(self.database_schema.SORTED_CORE_GENES)]
@@ -266,7 +268,15 @@ class AnnDataset(BaseModel):
 
         return presence_matrix.tocoo()
 
-    def write(self, output_filepath: Union[str, Path, S3Path]):
+    def write(self, output_filepath: Union[str, Path, S3Path]) -> Union[Path, S3Path]:
+        """Write the AnnDataset to H5AD format at a specific filepath
+
+        Args:
+            output_filepath (Union[str, Path, S3Path]): Needs to end with `.h5ad`
+
+        Returns:
+            Union[Path, S3Path]: Location of written H5AD object
+        """
 
         # TODO: method to deal with string path logic
         if isinstance(output_filepath, str):
@@ -275,12 +285,26 @@ class AnnDataset(BaseModel):
             else:
                 output_filepath = Path(output_filepath)
 
+        if output_filepath.suffix != ".h5ad":
+            raise ValueError("Please ensure the output filepath is a H5AD path i.e. ends with the `.h5ad` extension.")
+
         logger.info(f"Saving AnnData as H5AD to {output_filepath}...")
+        output_filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        if output_filepath.exists():
+            logger.info(f"H5AD exists at {output_filepath.as_posix()}, overwriting...")
+
         if isinstance(output_filepath, Path):
-            self.artifact.write_h5ad(filename=output_filepath, compression="gzip")
+            # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
+            anndata.io.write_h5ad(
+                filepath=output_filepath, adata=self.artifact, compression="gzip", convert_strings_to_categoricals=False
+            )
         elif isinstance(output_filepath, S3Path):
             temp_path = Path(f"/tmp/{output_filepath.basename}")
-            self.artifact.write_h5ad(filename=temp_path, compression="gzip")
+            # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
+            anndata.io.write_h5ad(
+                filepath=temp_path, adata=self.artifact, compression="gzip", convert_strings_to_categoricals=False
+            )
             output_filepath.upload_file(temp_path, overwrite=True)
 
         return output_filepath
