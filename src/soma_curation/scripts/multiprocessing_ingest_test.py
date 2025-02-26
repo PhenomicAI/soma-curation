@@ -1,6 +1,7 @@
 import argparse
 import sys
 import pickle
+import multiprocessing
 from pathlib import Path
 
 from ..sc_logging import logger, _set_level, init_worker_logging
@@ -13,7 +14,9 @@ from ..ingest.ingestion_funcs import (
 )
 from ..atlas.crud import AtlasManager
 from ..executor.executors import MultiprocessingExecutor
+from ..mtx_collection.mtx_collection import MtxCollection
 from ..config.config import PipelineConfig
+from ..schema.load import load_schema
 
 
 def main():
@@ -37,6 +40,8 @@ def main():
         h5ad_storage_dir=args.h5ad_storage_dir,
         atlas_storage_dir=args.atlas_storage_dir,
         processes=args.processes,
+        db_schema_uri=None,
+        validation_schema_uri=None,
     )
 
     # 2) Set up logging. We create a logs directory inside the atlas directory.
@@ -45,6 +50,7 @@ def main():
     _set_level(level=10, add_file_handler=True, log_dir=log_dir, log_file=f"{pc.atlas_name}.log")
 
     logger.info("Starting pipeline execution...")
+    logger.info(pc.db_schema)
 
     # 5) Initialize AtlasManager
     am = AtlasManager(atlas_name=pc.atlas_name, storage_directory=pc.atlas_storage_dir, globals_=pc.db_schema)
@@ -123,4 +129,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if multiprocessing.get_start_method(True) != "spawn":
+        multiprocessing.set_start_method("spawn", True)
+
     main()

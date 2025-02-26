@@ -6,9 +6,9 @@ import anndata as ad
 
 from typing import List, Tuple, Optional, Union, Generator
 from fast_matrix_market import mmread
-from s3pathlib import S3Path
+from cloudpathlib import CloudPath
 
-from ..schema import DatabaseSchema
+from ..schema.objects import DatabaseSchema
 from ..sc_logging import logger
 
 
@@ -43,7 +43,7 @@ class MtxCollection(BaseModel):
         _type_: CollectionSpec
     """
 
-    storage_directory: Union[Path, S3Path]
+    storage_directory: Union[Path, CloudPath]
     db_schema: DatabaseSchema
     include: Optional[List[str]] = None
 
@@ -51,16 +51,16 @@ class MtxCollection(BaseModel):
 
     @field_validator("storage_directory", mode="before")
     @classmethod
-    def ensure_typing_of_path(cls, raw: str) -> Union[S3Path, Path]:
+    def ensure_typing_of_path(cls, raw: str) -> Union[CloudPath, Path]:
         if raw.startswith("s3://"):
-            path = S3Path(raw + "/")
+            path = CloudPath(raw + "/")
         else:
             path = Path(raw + "/")
         assert path.exists(), f"{path} does not exist."
 
         return path
 
-    def list_studies(self) -> List[Union[Path, S3Path]]:
+    def list_studies(self) -> List[Union[Path, CloudPath]]:
         all_studies = [study_path.parts[-1] for study_path in self.clean_listdir(self.storage_directory)]
 
         if self.include:
@@ -69,7 +69,7 @@ class MtxCollection(BaseModel):
             return filtered_studies
         return all_studies
 
-    def list_samples(self, study_name: str) -> List[Union[Path, S3Path]]:
+    def list_samples(self, study_name: str) -> List[Union[Path, CloudPath]]:
         study_path = self.storage_directory / study_name / "mtx"
         return [sample_path.parts[-1] for sample_path in self.clean_listdir(study_path)]
 
@@ -125,17 +125,17 @@ class MtxCollection(BaseModel):
 
     @staticmethod
     def clean_listdir(
-        path: Union[Path, S3Path], ignore_patterns: List[str] = [".DS_Store", ".log"]
-    ) -> Generator[Union[Path, S3Path], None, None]:
+        path: Union[Path, CloudPath], ignore_patterns: List[str] = [".DS_Store", ".log"]
+    ) -> Generator[Union[Path, CloudPath], None, None]:
         """
         A generator that yields directory contents, ignoring specific files or patterns.
 
         Args:
-            path (Union[Path, S3Path]): The directory to list contents from.
+            path (Union[Path, CloudPath]): The directory to list contents from.
             ignore_patterns (List[str]): List of patterns to ignore (e.g., ".DS_Store").
 
         Yields:
-            Union[Path, S3Path]: Valid directory components.
+            Union[Path, CloudPath]: Valid directory components.
         """
         if not path.is_dir():
             path = path.to_dir()
@@ -144,7 +144,7 @@ class MtxCollection(BaseModel):
                 yield item
 
     def read_mtx(
-        self, root_fp: Union[Path, S3Path], files: Optional[List[str]] = None
+        self, root_fp: Union[Path, CloudPath], files: Optional[List[str]] = None
     ) -> Tuple[Optional[sp.csr_matrix], Optional[pd.DataFrame], Optional[pd.DataFrame]]:
         matrix, barcodes_df, features_df = None, None, None
         if files is None:
@@ -162,7 +162,7 @@ class MtxCollection(BaseModel):
 
         return matrix, barcodes_df, features_df
 
-    def read_metadata_file(self, fp: Union[Path, S3Path], reindex_columns: List[str]) -> pd.DataFrame:
+    def read_metadata_file(self, fp: Union[Path, CloudPath], reindex_columns: List[str]) -> pd.DataFrame:
         try:
             metadata_df = self.read_csv(fp, sep="\t")
             metadata_df = metadata_df.reindex(columns=reindex_columns, fill_value="Unknown")
@@ -173,30 +173,30 @@ class MtxCollection(BaseModel):
         return metadata_df
 
     @staticmethod
-    def read_csv(filepath: Union[S3Path, Path], **kwargs) -> pd.DataFrame:
-        # Long form of reading versus supplying path because that's how S3Path reads are supported
-        # Pandas does not support S3Paths atm
+    def read_csv(filepath: Union[CloudPath, Path], **kwargs) -> pd.DataFrame:
+        # Long form of reading versus supplying path because that's how CloudPath reads are supported
+        # Pandas does not support CloudPaths atm
         # This helps eliminate the if-else for s3 versus normal posix paths
         # https://s3pathlib.readthedocs.io/en/latest/03-S3-Write-API.html#Pandas
-        if isinstance(filepath, S3Path):
+        if isinstance(filepath, CloudPath):
             with filepath.open("rb") as f:
                 df = pd.read_csv(f, **kwargs)
         elif isinstance(filepath, Path):
             df = pd.read_csv(filepath, **kwargs)
         else:
-            raise ValueError("Unsupported filepath type. Filepath needs to be s3pathlib S3Path or pathlib Path.")
+            raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib CloudPath or pathlib Path.")
         return df
 
     @staticmethod
-    def mmread(filepath: Union[S3Path, Path]) -> sp.csr_matrix:
-        if isinstance(filepath, S3Path):
-            # S3Path handles .gz automatically
+    def mmread(filepath: Union[CloudPath, Path]) -> sp.csr_matrix:
+        if isinstance(filepath, CloudPath):
+            # CloudPath handles .gz automatically
             with filepath.open("rb") as f:
                 matrix = mmread(f).T.tocsr()
         elif isinstance(filepath, Path):
             matrix = mmread(filepath).T.tocsr()
         else:
-            raise ValueError("Unsupported filepath type. Filepath needs to be s3pathlib S3Path or pathlib Path.")
+            raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib CloudPath or pathlib Path.")
 
         return matrix
 

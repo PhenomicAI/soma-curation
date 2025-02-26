@@ -5,10 +5,8 @@ from pathlib import Path
 from tiledbsoma.io import ExperimentAmbientLabelMapping
 
 from ..sc_logging import logger
-from ..schema import SOMA_TileDB_Context, DatabaseSchema
 from ..dataset.anndataset import AnnDataset
-from ..mtx_collection.mtx_collection import MtxCollection
-from ..config.config import PipelineConfig
+from ..config.config import PipelineConfig, SOMA_TileDB_Context
 
 
 def create_registration_mapping(

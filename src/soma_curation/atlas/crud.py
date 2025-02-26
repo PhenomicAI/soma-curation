@@ -9,9 +9,10 @@ from typing import Union, Generator
 from contextlib import contextmanager
 from typing_extensions import Annotated
 
-from ..schema import DatabaseSchema, SOMA_TileDB_Context
+from ..schema.objects import DatabaseSchema
 from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
+from ..config.config import SOMA_TileDB_Context
 
 
 def expand_paths(value: Union[str, Path]) -> Path:

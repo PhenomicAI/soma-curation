@@ -1,244 +1,13 @@
 import pyarrow as pa
-import yaml
-import tiledbsoma as soma
-import tiledb
 import pandas as pd
 import importlib
 
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 from functools import cached_property
-from pydantic import BaseModel, ConfigDict, validate_call, Field, computed_field
-from typing import Dict, Any, Literal, List, Set
-
-from .sc_logging import logger
-
-
-DEFAULT_TILEDB_CONFIG = {
-    "py.max_incomplete_retries": 100,
-    "py.init_buffer_bytes": 536870912,
-    "soma.init_buffer_bytes": 536870912,
-    "sm.consolidation.buffer_size": 1073741824,
-    "sm.consolidation.step_max_frags": 100,
-    "sm.consolidation.step_min_frags": 3,
-}
-
-
-# TODO: convert to singleton to speed up (if necessary)
-def SOMA_TileDB_Context() -> soma.options.SOMATileDBContext:
-    """
-    Create and return a SOMA TileDB context with default configuration.
-
-    Returns:
-    - soma.options.SOMATileDBContext
-        The configured SOMA TileDB context.
-    """
-    return soma.options.SOMATileDBContext(tiledb_ctx=TileDB_Ctx(), timestamp=None)
-
-
-def TileDB_Ctx() -> tiledb.Ctx:
-    """
-    Create and return a TileDB context with default configuration.
-
-    Returns:
-    - tiledb.Ctx
-        The configured TileDB context.
-    """
-    return tiledb.Ctx(DEFAULT_TILEDB_CONFIG)
-
-
-# your YAML configuration
-sample_global_config = """
-# Names of arrays in the PAI-SOMA schema
-PAI_SCHEMA_VERSION: 1.0.0
-MEASUREMENT_RNA_NAME: RNA
-PAI_PRESENCE_MATRIX_NAME: feature_presence_matrix
-
-# Core genes path
-CORE_GENE_SET_PATH: 
-
-# Columns and data types
-PAI_OBS_INDEX_COLUMNS: &PAI_OBS_INDEX_COLUMNS
-    soma_joinid: int64
-
-PAI_OBS_SAMPLE_COLUMNS: &PAI_OBS_SAMPLE_COLUMNS
-    sample_name: categorical__large_string
-    scrnaseq_protocol: categorical__large_string
-    study_name: categorical__large_string
-
-PAI_OBS_CELL_COLUMNS: &PAI_OBS_CELL_COLUMNS
-    barcode: large_string
-    cell_type: categorical__large_string
-
-PAI_OBS_COMPUTED_COLUMNS: &PAI_OBS_COMPUTED_COLUMNS
-    nnz: uint32
-    umi_counts: uint32
-    pct_mito: float32
-    pct_ribo: float32
-
-COMPUTED_COLUMN_FUNCTIONS:
-    nnz: compute_nnz
-    umi_counts: compute_umi_counts
-    pct_mito: compute_pct_mito
-    pct_ribo: compute_pct_ribo
-    
-PAI_OBS_TERM_COLUMNS:
-    <<: *PAI_OBS_INDEX_COLUMNS
-    <<: *PAI_OBS_CELL_COLUMNS
-    <<: *PAI_OBS_SAMPLE_COLUMNS
-    <<: *PAI_OBS_COMPUTED_COLUMNS
-
-PAI_VAR_INDEX_COLUMNS: &PAI_VAR_INDEX_COLUMNS
-    soma_joinid: int64
-
-PAI_VAR_COLUMNS: &PAI_VAR_COLUMNS
-    gene: large_string
-    ens: large_string
-    
-PAI_VAR_TERM_COLUMNS:
-    <<: *PAI_VAR_INDEX_COLUMNS
-    <<: *PAI_VAR_COLUMNS
-
-PAI_X_LAYERS:
-    col_raw: uint32
-    col_norm: float32
-    row_raw: uint32
-    row_norm: float32
-
-PAI_OBSM_INDEX_COLUMN:
-    soma_joinid: int64
-
-PAI_OBSM_LAYERS:
-    embeddings: float32    
-    umap: float32
-
-PAI_PRESENCE_LAYER: uint8
-
-# Platform config for TileDB arrays
-PAI_OBS_PLATFORM_CONFIG:
-    tiledb:
-        create:
-            capacity: 16384
-            tile_order: row-major
-            cell_order: row-major
-            offsets_filters: [DoubleDeltaFilter, {_type: ZstdFilter, level: 9}]
-            allows_duplicates: False
-
-PAI_VAR_PLATFORM_CONFIG:
-    tiledb:
-        create:
-            capacity: 131072
-            offsets_filters: [DoubleDeltaFilter, {_type: ZstdFilter, level: 9}]
-            allows_duplicates: False
-
-PAI_X_LAYERS_PLATFORM_CONFIG:
-    col_raw:
-        tiledb:
-            create:
-                capacity: 131072
-                dims:
-                    soma_dim_0: 
-                        tile: 262144
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                    soma_dim_1:
-                        tile: 1
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                attrs:
-                    soma_data:
-                        filters: [{_type: ZstdFilter, level: 5}]
-                cell_order: col-major
-                tile_order: col-major
-                allows_duplicates: False
-    col_norm:
-        tiledb:
-            create: 
-                capacity: 131072
-                dims:
-                    soma_dim_0:
-                        tile: 262144
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                    soma_dim_1:
-                        tile: 1
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                attrs:
-                    soma_data:
-                        filters: [{_type: ZstdFilter, level: 5}]
-                cell_order: col-major
-                tile_order: col-major
-                allows_duplicates: False
-    row_raw:
-        tiledb:
-            create:
-                capacity: 131072
-                dims: 
-                    soma_dim_0:
-                        tile: 1
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                    soma_dim_1:
-                        tile: 35804
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                attrs:
-                    soma_data:
-                        filters: [{_type: ZstdFilter, level: 5}]
-                cell_order: row-major
-                tile_order: row-major
-                allows_duplicates: False
-    row_norm:
-        tiledb:
-            create:
-                capacity: 131072
-                dims:
-                    soma_dim_0:
-                        tile: 1
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                    soma_dim_1:
-                        tile: 35804
-                        filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                attrs:
-                    soma_data:
-                        filters: [{_type: ZstdFilter, level: 5}]
-                cell_order: row-major
-                tile_order: row-major
-                allows_duplicates: False
-
-PAI_PRESENCE_PLATFORM_CONFIG:
-    tiledb:
-        create:
-            capacity: 131072
-            dims:
-                soma_dim_0:
-                    tile: 1
-                    filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-                soma_dim_1:
-                    tile: 35804
-                    filters: [ByteShuffleFilter, {_type: ZstdFilter, level: 9}]
-            cell_order: row-major
-            tile_order: row-major
-            allows_duplicates: False
-"""
-
-sample_validation_schema = """
-REQUIRED_OBS_COLUMNS: 
-    - barcode 
-    - sample_name 
-    - study_name 
-REQUIRED_VAR_COLUMNS: 
-    - gene
-GENE_INTERSECTION_THRESHOLD_FRAC: 0.1
-"""
+from typing import Dict, Any, List, Literal, Set
 
 
 class ValidationSchema(BaseModel):
-    """
-    ValidationSchema class defines the schema used for validating single-cell RNA sequencing data.
-
-    Attributes:
-    - REQUIRED_OBS_COLUMNS: List[str]
-        List of required columns in the .obs attribute.
-    - REQUIRED_VAR_COLUMNS: List[str]
-        List of required columns in the .var attribute.
-    - GENE_INTERSECTION_THRESHOLD_FRAC: float
-        The threshold fraction for gene intersection.
-    """
-
     REQUIRED_OBS_COLUMNS: List[str]
     REQUIRED_VAR_COLUMNS: List[str]
     GENE_INTERSECTION_THRESHOLD_FRAC: float
@@ -347,7 +116,7 @@ class DatabaseSchema(BaseModel):
         """
         Fetch and set functions for computed columns from the specified module.
         """
-        module = importlib.import_module(".dataset.standardize", package=__package__)
+        module = importlib.import_module("soma_curation.dataset.standardize", package=__package__)
 
         for col in self.PAI_OBS_COMPUTED_COLUMNS:
             func = getattr(module, self.COMPUTED_COLUMN_FUNCTIONS[col])
@@ -472,21 +241,14 @@ class DatabaseSchema(BaseModel):
         return var_df
 
 
-def convert_types(dict_: str) -> Dict[str, Any]:
+def convert_types(d: dict):
     """
-    Convert string data types to PyArrow data types in a dictionary.
-
-    Parameters:
-    - dict_: str
-        The dictionary containing data type strings.
-
-    Returns:
-    - Dict[str, Any]
-        The dictionary with converted PyArrow data types.
+    Recursively convert string data types (e.g. 'int64', 'large_string')
+    to PyArrow data types in-place.
     """
     pyarrow_mapping = {
         "large_string": pa.large_string(),
-        "categorical__large_string": pa.dictionary(pa.int32(), pa.large_string(), ordered=0),
+        "categorical__large_string": pa.dictionary(pa.int32(), pa.large_string(), ordered=False),
         "string": pa.string(),
         "int64": pa.int64(),
         "int32": pa.int32(),
@@ -495,84 +257,9 @@ def convert_types(dict_: str) -> Dict[str, Any]:
         "float32": pa.float32(),
         "bool_": pa.bool_(),
     }
-
-    for k, v in dict_.items():
-        if isinstance(v, dict):
-            convert_types(dict_[k])
-        elif isinstance(v, str):
-            if v in pyarrow_mapping.keys():
-                dict_[k] = pyarrow_mapping[v]
-
-    return None
-
-
-@validate_call
-def read_yaml(yaml_string: str) -> Dict[str, Any]:
-    """
-    Read and parse a YAML string into a dictionary.
-
-    Parameters:
-    - yaml_string: str
-        The YAML string to parse.
-
-    Returns:
-    - Dict[str, Any]
-        The parsed dictionary.
-    """
-    dict_: Dict[str, Any] = yaml.safe_load(yaml_string)
-    return dict_
-
-
-@validate_call
-def read_globals_yaml(yaml_string: str) -> Dict[str, Any]:
-    """
-    Read and parse a YAML string into a dictionary and convert data types.
-
-    Parameters:
-    - yaml_string: str
-        The YAML string to parse.
-
-    Returns:
-    - Dict[str, Any]
-        The parsed and converted dictionary.
-    """
-    dict_ = read_yaml(yaml_string)
-    convert_types(dict_)
-    return dict_
-
-
-@validate_call
-def get_validation_schema() -> ValidationSchema:
-    """
-    Get the validation schema.
-
-    Returns:
-    - ValidationSchema
-        The validation schema object.
-    """
-    return ValidationSchema(**read_yaml(sample_validation_schema))
-
-
-@validate_call
-def get_schema() -> DatabaseSchema:
-    """
-    Get the database schema.
-
-    Returns:
-    - DatabaseSchema
-        The database schema object.
-    """
-    dict_ = read_globals_yaml(sample_global_config)
-    validation_schema = get_validation_schema()
-    dict_["VALIDATION_SCHEMA"] = validation_schema
-
-    user_core_path = dict_.get("CORE_GENE_SET_PATH")
-
-    # For demo-purposes, we want it to work out the box
-    # sometimes use core path will be null and so we just warn users and use a dummy gene list
-    if user_core_path is None:
-        logger.warning("CORE_GENE_SET_PATH is null or missing. Using dummy_core_geneset.tsv.gz instead.")
-        core_gene_set_path = importlib.resources.files("soma_curation.constants").joinpath("dummy_core_geneset.tsv.gz")
-        dict_["CORE_GENE_SET_PATH"] = str(core_gene_set_path)
-
-    return DatabaseSchema(**dict_)
+    for key, val in d.items():
+        if isinstance(val, dict):
+            convert_types(val)  # recurse
+        elif isinstance(val, str):
+            if val in pyarrow_mapping:
+                d[key] = pyarrow_mapping[val]

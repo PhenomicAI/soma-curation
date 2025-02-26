@@ -9,9 +9,9 @@ from typing import List, Tuple, Union
 from typing_extensions import Self
 from pydantic import BaseModel, ConfigDict, model_validator, Field, computed_field
 from pathlib import Path
-from s3pathlib import S3Path
+from cloudpathlib import CloudPath
 
-from ..schema import DatabaseSchema
+from ..schema.objects import DatabaseSchema
 from ..sc_logging import logger
 from .standardize.funcs import normalize_raw_array
 
@@ -226,7 +226,9 @@ class AnnDataset(BaseModel):
                 dtype = self.database_schema.PAI_VAR_TERM_COLUMNS[col].to_pandas_dtype()
                 self.artifact.var[col] = self.artifact.var[col].fillna(None)
             except Exception as e:
-                logger.debug(f"Cannot standardize col {col}: {e}")
+                logger.warning(
+                    f"Cannot standardize col {col}: {e} since it does not have associated pandas dtype. Casting to string."
+                )
                 dtype = "str"
                 self.artifact.var[col] = self.artifact.var[col].fillna("").astype(dtype)
         self.artifact = self.artifact[:, self.artifact.var["gene"].isin(self.database_schema.SORTED_CORE_GENES)]
@@ -268,20 +270,20 @@ class AnnDataset(BaseModel):
 
         return presence_matrix.tocoo()
 
-    def write(self, output_filepath: Union[str, Path, S3Path]) -> Union[Path, S3Path]:
+    def write(self, output_filepath: Union[str, Path, CloudPath]) -> Union[Path, CloudPath]:
         """Write the AnnDataset to H5AD format at a specific filepath
 
         Args:
-            output_filepath (Union[str, Path, S3Path]): Needs to end with `.h5ad`
+            output_filepath (Union[str, Path, CloudPath]): Needs to end with `.h5ad`
 
         Returns:
-            Union[Path, S3Path]: Location of written H5AD object
+            Union[Path, CloudPath]: Location of written H5AD object
         """
 
         # TODO: method to deal with string path logic
         if isinstance(output_filepath, str):
             if output_filepath.startswith("s3://"):
-                output_filepath = S3Path(output_filepath)
+                output_filepath = CloudPath(output_filepath)
             else:
                 output_filepath = Path(output_filepath)
 
@@ -299,7 +301,7 @@ class AnnDataset(BaseModel):
             anndata.io.write_h5ad(
                 filepath=output_filepath, adata=self.artifact, compression="gzip", convert_strings_to_categoricals=False
             )
-        elif isinstance(output_filepath, S3Path):
+        elif isinstance(output_filepath, CloudPath):
             temp_path = Path(f"/tmp/{output_filepath.basename}")
             # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
             anndata.io.write_h5ad(
