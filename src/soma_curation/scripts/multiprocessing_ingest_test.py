@@ -18,6 +18,9 @@ from ..mtx_collection.mtx_collection import MtxCollection
 from ..config.config import PipelineConfig
 from ..schema.load import load_schema
 
+if multiprocessing.get_start_method(True) != "spawn":
+    multiprocessing.set_start_method("spawn", True)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run ingestion pipeline in parallel.")
@@ -126,10 +129,3 @@ def main():
         logger.warning(f"{ingest_result.num_failures} H5AD ingestion tasks failed.")
 
     logger.info("All pipeline steps completed. Exiting.")
-
-
-if __name__ == "__main__":
-    if multiprocessing.get_start_method(True) != "spawn":
-        multiprocessing.set_start_method("spawn", True)
-
-    main()
