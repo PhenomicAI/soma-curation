@@ -40,7 +40,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pai-soma-curation = "soma_curation.scripts.multiprocessing_ingest_test:main"
+pai-soma-curation = "soma_curation.scripts.multiprocessing_ingest:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

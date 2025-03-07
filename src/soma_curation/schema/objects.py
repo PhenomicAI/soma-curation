@@ -4,7 +4,7 @@ import importlib
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from functools import cached_property
-from typing import Dict, Any, List, Literal, Set
+from typing import Dict, Any, List, Literal, Set, Tuple
 
 
 class ValidationSchema(BaseModel):
@@ -24,26 +24,26 @@ class DatabaseSchema(BaseModel):
         The name of the RNA measurement.
     - PAI_PRESENCE_MATRIX_NAME: str
         The name of the presence matrix.
-    - PAI_OBS_INDEX_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of observation index columns and their data types.
-    - PAI_OBS_SAMPLE_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of observation sample columns and their data types.
+    - PAI_OBS_INDEX_COLUMNS: Tuple[str, pa.DataType]
+        Tuple of observation index columns and their data types.
+    - PAI_OBS_SAMPLE_COLUMNS: Tuple[str, pa.DataType]
+        Tuple of observation sample columns and their data types.
     - PAI_OBS_CELL_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of observation cell columns and their data types.
-    - PAI_OBS_COMPUTED_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of computed columns and their data types.
-    - PAI_OBS_TERM_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of observation term columns and their data types.
-    - PAI_VAR_INDEX_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of variable index columns and their data types.
-    - PAI_VAR_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of variable columns and their data types.
-    - PAI_VAR_TERM_COLUMNS: Dict[str, pa.DataType]
-        Dictionary of variable term columns and their data types.
-    - PAI_X_LAYERS: Dict[str, pa.DataType]
-        Dictionary of X layers and their data types.
-    - PAI_OBSM_INDEX_COLUMN: Dict[str, pa.DataType]
-        Dictionary of observation matrix index columns and their data types.
+        Tuple of observation cell columns and their data types.
+    - PAI_OBS_COMPUTED_COLUMNS: Tuple[str, pa.DataType]
+        Tuple of computed columns and their data types.
+    - PAI_OBS_TERM_COLUMNS: Tuple[str, pa.DataType]
+        Tuple of observation term columns and their data types.
+    - PAI_VAR_INDEX_COLUMNS: Tuple[str, pa.DataType]
+        Tuple of variable index columns and their data types.
+    - PAI_VAR_COLUMNS: Tuple[str, pa.DataType]
+        Tuple of variable columns and their data types.
+    - PAI_VAR_TERM_COLUMNS: Tuple[str, pa.DataType]
+        Tuple of variable term columns and their data types.
+    - PAI_X_LAYERS: Tuple[str, pa.DataType]
+        Tuple of X layers and their data types.
+    - PAI_OBSM_INDEX_COLUMN: Tuple[str, pa.DataType]
+        Tuple of observation matrix index columns and their data types.
     - PAI_PRESENCE_LAYER: pa.DataType
         Data type of the presence layer.
     - PAI_OBS_PLATFORM_CONFIG: Dict[str, Dict[str, Dict[str, Any]]]
@@ -77,17 +77,15 @@ class DatabaseSchema(BaseModel):
     CORE_GENE_SET_PATH: str = Field(repr=False)
 
     # Columns and types
-    PAI_OBS_INDEX_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_OBS_SAMPLE_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_OBS_CELL_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_OBS_COMPUTED_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_OBS_TERM_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_VAR_INDEX_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_VAR_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_VAR_TERM_COLUMNS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_X_LAYERS: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_OBSM_INDEX_COLUMN: Dict[str, pa.DataType] = Field(repr=False)
-    PAI_PRESENCE_LAYER: pa.DataType = Field(repr=False)
+    PAI_OBS_INDEX_COLUMNS: List[Tuple[str, pa.DataType]]
+    PAI_OBS_SAMPLE_COLUMNS: List[Tuple[str, pa.DataType]]
+    PAI_OBS_CELL_COLUMNS: List[Tuple[str, pa.DataType]]
+    PAI_OBS_COMPUTED_COLUMNS: List[Tuple[str, pa.DataType]]
+    PAI_VAR_INDEX_COLUMNS: List[Tuple[str, pa.DataType]]
+    PAI_VAR_COLUMNS: List[Tuple[str, pa.DataType]]
+    PAI_X_LAYERS: List[Tuple[str, pa.DataType]]
+    PAI_OBSM_INDEX_COLUMN: List[Tuple[str, pa.DataType]]
+    PAI_PRESENCE_LAYER: pa.DataType
 
     # Platform configs for creation
     PAI_OBS_PLATFORM_CONFIG: Dict[str, Dict[str, Dict[str, Any]]] = Field(repr=False)
@@ -112,13 +110,19 @@ class DatabaseSchema(BaseModel):
         [self.apply_filters(l) for l in ["obs", "var"]]
         self.fetch_and_functions()
 
+    def get_column_names(self, columns: List[Tuple[str, pa.DataType]]) -> List[str]:
+        """
+        Return the column names from a list of (column_name, dtype).
+        """
+        return [col_name for (col_name, _) in columns]
+
     def fetch_and_functions(self):
         """
         Fetch and set functions for computed columns from the specified module.
         """
         module = importlib.import_module("soma_curation.dataset.standardize", package=__package__)
 
-        for col in self.PAI_OBS_COMPUTED_COLUMNS:
+        for col, _ in self.PAI_OBS_COMPUTED_COLUMNS:
             func = getattr(module, self.COMPUTED_COLUMN_FUNCTIONS[col])
 
             self.COMPUTED_COLUMN_FUNCTIONS[col] = func
@@ -148,11 +152,11 @@ class DatabaseSchema(BaseModel):
             },
         }
 
-        layer_index: Dict[str, pa.DataType] = layer_mapping[layer]["index"]
-        layer_term_columns: Dict[str, pa.DataType] = layer_mapping[layer]["term_columns"]
+        layer_index: List[Tuple[str, pa.DataType]] = layer_mapping[layer]["index"]
+        layer_term_columns: List[Tuple[str, pa.DataType]] = layer_mapping[layer]["term_columns"]
         layer_platform_config: Dict[str, Dict[str, Dict[str, Any]]] = layer_mapping[layer]["platform_config"]
 
-        for column, dtype in layer_term_columns.items():
+        for column, dtype in layer_term_columns:
             if column in layer_index:
                 dim_attr_key = "dims"
                 if dim_attr_key not in layer_platform_config["tiledb"]["create"]:
@@ -183,6 +187,21 @@ class DatabaseSchema(BaseModel):
                     layer_platform_config["tiledb"]["create"][dim_attr_key][column] = {
                         "filters": [{"_type": "ZstdFilter", "level": 9}]
                     }
+
+    @computed_field(repr=False)
+    @cached_property
+    def PAI_OBS_TERM_COLUMNS(self) -> Tuple[str, pa.DataType]:
+        return (
+            self.PAI_OBS_INDEX_COLUMNS
+            + self.PAI_OBS_CELL_COLUMNS
+            + self.PAI_OBS_SAMPLE_COLUMNS
+            + self.PAI_OBS_COMPUTED_COLUMNS
+        )
+
+    @computed_field(repr=False)
+    @cached_property
+    def PAI_VAR_TERM_COLUMNS(self) -> Tuple[str, pa.DataType]:
+        return self.PAI_VAR_INDEX_COLUMNS + self.PAI_VAR_COLUMNS
 
     @computed_field(repr=False)
     @cached_property
@@ -241,10 +260,10 @@ class DatabaseSchema(BaseModel):
         return var_df
 
 
-def convert_types(d: dict):
+def convert_types_in_list_of_tuples(tuples_list):
     """
-    Recursively convert string data types (e.g. 'int64', 'large_string')
-    to PyArrow data types in-place.
+    Given a list of (col_name, type_str), convert the type_str to a pyarrow dtype
+    if recognized, in place. Returns the same list object for convenience.
     """
     pyarrow_mapping = {
         "large_string": pa.large_string(),
@@ -257,9 +276,38 @@ def convert_types(d: dict):
         "float32": pa.float32(),
         "bool_": pa.bool_(),
     }
+    for i, (col_name, type_str) in enumerate(tuples_list):
+        if isinstance(type_str, str) and type_str in pyarrow_mapping:
+            tuples_list[i] = (col_name, pyarrow_mapping[type_str])
+    return tuples_list
+
+
+def convert_types(d: dict):
+    """
+    Recursively convert:
+     - string data types in dictionary keys (like "int64" -> pa.int64())
+     - list of (col_name, type_str) => (col_name, pa.DataType)
+    """
+    pyarrow_mapping = {
+        "large_string": pa.large_string(),
+        "categorical__large_string": pa.dictionary(pa.int32(), pa.large_string(), ordered=False),
+        "string": pa.string(),
+        "int64": pa.int64(),
+        "int32": pa.int32(),
+        "uint8": pa.uint8(),
+        "uint32": pa.uint32(),
+        "float32": pa.float32(),
+        "bool_": pa.bool_(),
+    }
+
     for key, val in d.items():
+        # 1) If the value is a dict => recurse
         if isinstance(val, dict):
-            convert_types(val)  # recurse
-        elif isinstance(val, str):
-            if val in pyarrow_mapping:
-                d[key] = pyarrow_mapping[val]
+            convert_types(val)
+        # 2) If it's a list of 2-tuples => convert each second item
+        elif isinstance(val, list) and all(isinstance(item, (tuple, list)) and len(item) == 2 for item in val):
+            convert_types_in_list_of_tuples(val)
+        # 3) If it's a single string recognized in pyarrow_mapping => convert
+        elif isinstance(val, str) and val in pyarrow_mapping:
+            d[key] = pyarrow_mapping[val]
+        # Otherwise do nothing special

@@ -42,19 +42,18 @@ class PipelineConfig(BaseModel):
     atlas_storage_dir: str
 
     db_schema_uri: Optional[str] = None
-    validation_schema_uri: Optional[str] = None
 
     processes: int = 4
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @computed_field
+    @computed_field(repr=False)
     @property
     def db_schema(self) -> DatabaseSchema:
         if not self.db_schema_uri:
             # Optionally: return the default schema if no URI provided
-            return load_schema(None, None)
-        return load_schema(self.db_schema_uri, self.validation_schema_uri)
+            return load_schema(None)
+        return load_schema(self.db_schema_uri)
 
     @computed_field
     @property
@@ -71,7 +70,6 @@ def get_pipeline_config(
     atlas_storage_dir: str,
     processes: int = 4,
     db_schema_uri: Optional[str] = None,
-    validation_schema_uri: Optional[str] = None,
 ) -> PipelineConfig:
     return PipelineConfig(
         atlas_name=atlas_name,
@@ -80,5 +78,4 @@ def get_pipeline_config(
         atlas_storage_dir=atlas_storage_dir,
         processes=processes,
         db_schema_uri=db_schema_uri,
-        validation_schema_uri=validation_schema_uri,
     )

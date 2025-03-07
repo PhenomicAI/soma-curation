@@ -77,13 +77,17 @@ class MtxCollection(BaseModel):
         logger.info(f"Reading sample metadata for {study_name} from {self.storage_directory}...")
         sample_metadata_path = self.storage_directory / study_name / "sample_metadata" / f"{study_name}.tsv.gz"
 
-        return self.read_metadata_file(sample_metadata_path, reindex_columns=self.db_schema.PAI_OBS_SAMPLE_COLUMNS)
+        return self.read_metadata_file(
+            sample_metadata_path, reindex_columns=[x[0] for x in self.db_schema.PAI_OBS_SAMPLE_COLUMNS]
+        )
 
     def get_cell_metadata(self, study_name: str) -> pd.DataFrame:
         logger.info(f"Reading cell metadata for {study_name} from {self.storage_directory}...")
         cell_metadata_path = self.storage_directory / study_name / "cell_metadata" / f"{study_name}.tsv.gz"
 
-        return self.read_metadata_file(cell_metadata_path, reindex_columns=self.db_schema.PAI_OBS_CELL_COLUMNS)
+        return self.read_metadata_file(
+            cell_metadata_path, reindex_columns=[x[0] for x in self.db_schema.PAI_OBS_CELL_COLUMNS]
+        )
 
     def get_mtx(
         self, study_name: str, sample_name: str
@@ -106,7 +110,7 @@ class MtxCollection(BaseModel):
                 dataframe=barcodes,
                 metadata_df=cell_metadata,
                 join=["barcode"],
-                columns_to_add=list(self.db_schema.PAI_OBS_CELL_COLUMNS),
+                columns_to_add=[x[0] for x in self.db_schema.PAI_OBS_CELL_COLUMNS],
             )
         if add_sample_metadata:
             sample_metadata = self.get_sample_metadata(study_name=study_name)
@@ -114,7 +118,7 @@ class MtxCollection(BaseModel):
                 dataframe=barcodes,
                 metadata_df=sample_metadata,
                 join=["sample_name"],
-                columns_to_add=list(self.db_schema.PAI_OBS_SAMPLE_COLUMNS),
+                columns_to_add=[x[0] for x in self.db_schema.PAI_OBS_SAMPLE_COLUMNS],
             )
 
         barcodes.index = barcodes["barcode"].astype(str)
@@ -137,8 +141,6 @@ class MtxCollection(BaseModel):
         Yields:
             Union[Path, CloudPath]: Valid directory components.
         """
-        if not path.is_dir():
-            path = path.to_dir()
         for item in path.iterdir():
             if not any(pattern in item.parts[-1] for pattern in ignore_patterns):
                 yield item
@@ -178,10 +180,7 @@ class MtxCollection(BaseModel):
         # Pandas does not support CloudPaths atm
         # This helps eliminate the if-else for s3 versus normal posix paths
         # https://s3pathlib.readthedocs.io/en/latest/03-S3-Write-API.html#Pandas
-        if isinstance(filepath, CloudPath):
-            with filepath.open("rb") as f:
-                df = pd.read_csv(f, **kwargs)
-        elif isinstance(filepath, Path):
+        if isinstance(filepath, (CloudPath, Path)):
             df = pd.read_csv(filepath, **kwargs)
         else:
             raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib CloudPath or pathlib Path.")
@@ -189,14 +188,9 @@ class MtxCollection(BaseModel):
 
     @staticmethod
     def mmread(filepath: Union[CloudPath, Path]) -> sp.csr_matrix:
-        if isinstance(filepath, CloudPath):
-            # CloudPath handles .gz automatically
-            with filepath.open("rb") as f:
-                matrix = mmread(f).T.tocsr()
-        elif isinstance(filepath, Path):
-            matrix = mmread(filepath).T.tocsr()
-        else:
+        if not isinstance(filepath, (CloudPath, Path)):
             raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib CloudPath or pathlib Path.")
+        matrix = mmread(filepath).T.tocsr()
 
         return matrix
 

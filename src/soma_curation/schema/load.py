@@ -2,32 +2,28 @@ import yaml
 import importlib
 
 from cloudpathlib import AnyPath
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .objects import DatabaseSchema, ValidationSchema, convert_types
-from .defaults import DEFAULT_DATABASE_SCHEMA_DICT, DEFAULT_VALIDATION_DICT
+from .defaults import DEFAULT_DATABASE_SCHEMA_DICT
 from ..sc_logging import logger
 
 
-def merge_dicts(user: dict, default: dict) -> dict:
+def deep_merge_dict(orig: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Recursively merge keys from 'default' into 'user' if they don't exist in 'user'.
-    If both 'user' and 'default' have a dict under the same key,
-    merge them recursively.
+    Recursively merges 'override' into 'orig'.
+      - If both orig[k] and override[k] are dicts, merge them.
+      - Otherwise override orig[k] with override[k].
     """
-    for k, v in default.items():
-        if k not in user:
-            user[k] = v
+    for k, v in override.items():
+        if k in orig and isinstance(orig[k], dict) and isinstance(v, dict):
+            deep_merge_dict(orig[k], v)
         else:
-            if isinstance(v, dict) and isinstance(user[k], dict):
-                merge_dicts(user[k], v)
-    return user
+            orig[k] = v
+    return orig
 
 
-def load_schema(
-    db_config_uri: Optional[str] = None,
-    validation_config_uri: Optional[str] = None,
-) -> DatabaseSchema:
+def load_schema(db_config_uri: Optional[str] = None) -> DatabaseSchema:
     """
     Load a minimal or full DatabaseSchema YAML from a local file, S3, GCS, or Azure,
     merge it with your defaults, and return a DatabaseSchema object.
@@ -51,35 +47,19 @@ def load_schema(
         user_db_dict = {}
 
     # 2. Merge user’s partial dictionary with your default DB schema
-    merged_db_dict = merge_dicts(user_db_dict, DEFAULT_DATABASE_SCHEMA_DICT.copy())
+    merged_db_dict = deep_merge_dict(DEFAULT_DATABASE_SCHEMA_DICT.copy(), user_db_dict)
 
-    # 3. Load user’s partial validation config if provided
-    if validation_config_uri:
-        val_path = AnyPath(validation_config_uri)
-        with val_path.open("r") as vf:
-            user_val_dict = yaml.safe_load(vf)
-        if not isinstance(user_val_dict, dict):
-            raise ValueError(f"Invalid validation schema at {validation_config_uri}")
+    # 3. Build ValidationSchema object
+    merged_db_dict["VALIDATION_SCHEMA"] = ValidationSchema(**DEFAULT_DATABASE_SCHEMA_DICT["VALIDATION_SCHEMA"])
 
-        merged_val_dict = merge_dicts(user_val_dict, DEFAULT_VALIDATION_DICT.copy())
-    else:
-        # Use default validation if not provided
-        merged_val_dict = DEFAULT_VALIDATION_DICT.copy()
-
-    # 4. Build ValidationSchema object
-    validation_obj = ValidationSchema(**merged_val_dict)
-
-    # 5. Insert that into final dictionary
-    merged_db_dict["VALIDATION_SCHEMA"] = validation_obj
-
-    # 6. Convert string types to pyarrow dtypes
+    # 4. Convert string types to pyarrow dtypes
     convert_types(merged_db_dict)
 
-    # 7. Default core gene set path if not set
+    # 5. Default core gene set path if not set
     if merged_db_dict["CORE_GENE_SET_PATH"] is None:
         logger.warning("CORE_GENE_SET_PATH is null or missing. Using dummy_core_geneset.tsv.gz instead.")
         core_gene_set_path = importlib.resources.files("soma_curation.constants").joinpath("dummy_core_geneset.tsv.gz")
         merged_db_dict["CORE_GENE_SET_PATH"] = str(core_gene_set_path)
 
-    # 8. Instantiate your DatabaseSchema
+    # 6. Instantiate your DatabaseSchema
     return DatabaseSchema(**merged_db_dict)
