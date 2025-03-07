@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   draft_release:
@@ -29,50 +30,93 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  publish_package_and_docs:
-    # Only run if this is a "release" event with type "published"
-    if: github.event_name == 'release' && github.event.action == 'published'
+  build_package:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Configure Git credentials
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: python -m pip install build
+
+      - name: Build distribution
+        run: python -m build
+
+      - name: Upload distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/
+
+  publish_testpypi:
+    name: Publish to TestPyPI
+    needs: [build_package]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/soma-curation/
+    permissions:
+      id-token: write
+
+    if: contains(github.ref_name, '-rc')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/
+
+      - name: Publish to TestPyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+          publish_pypi:
+
+  publish_pypi:
+    name: Publish to PyPI
+    needs: [build_package]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/soma-curation/
+    permissions:
+      id-token: write
+
+    if: startsWith(github.ref, 'refs/tags/') && ! contains(github.ref_name, '-rc')
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/
+
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  deploy_docs:
+    name: Deploy Docs
+    needs: [publish_pypi]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: "3.11"
 
-      - name: Install build dependencies
-        run: |
-          pip install build twine
-
-      - name: Build the package
-        run: |
-          python -m build
-
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
-          TEST_PYPI_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
-          TEST_PYPI_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
-        run: |
-          TAG_NAME="${GITHUB_REF_NAME}"
-
-          if [[ "$TAG_NAME" == *"-rc"* ]]; then
-            echo "Publishing to Test PyPI..."
-            twine upload --repository-url https://test.pypi.org/legacy/ dist/*
-          else
-            echo "Publishing to Production PyPI..."
-            twine upload dist/*
-          fi
-
-      - name: Install MkDocs
+      - name: Install Dependencies (including MkDocs)
         run: |
           pip install -e ".[dev]"
 
