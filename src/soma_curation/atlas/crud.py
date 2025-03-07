@@ -9,9 +9,10 @@ from typing import Union, Generator
 from contextlib import contextmanager
 from typing_extensions import Annotated
 
-from ..schema import DatabaseSchema, SOMA_TileDB_Context
+from ..schema.objects import DatabaseSchema
 from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
+from ..config.config import SOMA_TileDB_Context
 
 
 def expand_paths(value: Union[str, Path]) -> Path:
@@ -132,20 +133,20 @@ class AtlasManager(BaseModel):
 
             # create `obs`
             obs_schema = pa.schema(
-                list(self.globals_.PAI_OBS_TERM_COLUMNS.items()),
+                self.globals_.PAI_OBS_TERM_COLUMNS,
                 metadata={
                     k: "nullable"
                     for k in (
-                        list(self.globals_.PAI_OBS_SAMPLE_COLUMNS.keys())
-                        + list(self.globals_.PAI_OBS_CELL_COLUMNS.keys())
-                        + list(self.globals_.PAI_OBS_COMPUTED_COLUMNS.keys())
+                        [x[0] for x in self.globals_.PAI_OBS_SAMPLE_COLUMNS]
+                        + [x[0] for x in self.globals_.PAI_OBS_CELL_COLUMNS]
+                        + [x[0] for x in self.globals_.PAI_OBS_COMPUTED_COLUMNS]
                     )
                 },
             )
             experiment.add_new_dataframe(
                 "obs",
                 schema=obs_schema,
-                index_column_names=list(self.globals_.PAI_OBS_INDEX_COLUMNS.keys()),
+                index_column_names=[x[0] for x in self.globals_.PAI_OBS_INDEX_COLUMNS],
                 platform_config=self.globals_.PAI_OBS_PLATFORM_CONFIG,
             )
 
@@ -159,23 +160,25 @@ class AtlasManager(BaseModel):
             rna_measurement.add_new_collection("obsm")
 
             # create `var` in the measurement
-            var_schema = pa.schema(list(self.globals_.PAI_VAR_TERM_COLUMNS.items()))
+            var_schema = pa.schema(self.globals_.PAI_VAR_TERM_COLUMNS)
             var = rna_measurement.add_new_dataframe(
                 "var",
                 schema=var_schema,
-                index_column_names=list(self.globals_.PAI_VAR_INDEX_COLUMNS.keys()),
+                index_column_names=[x[0] for x in self.globals_.PAI_VAR_INDEX_COLUMNS],
                 platform_config=self.globals_.PAI_VAR_PLATFORM_CONFIG,
                 domain=[[0, len(self.globals_.VAR_DF) - 1]],
             )
 
             # TODO: clean this little issue here
-            assert set(self.globals_.PAI_VAR_COLUMNS) == set(["gene", "ens"]), "Make sure that your var df aligns"
+            assert set([x[0] for x in self.globals_.PAI_VAR_COLUMNS]) == set(
+                ["gene", "ens"]
+            ), "Make sure that your var df aligns"
             table = pa.Table.from_pandas(self.globals_.VAR_DF, preserve_index=False)
             var.write(table)
 
             # create `X` in the measurement
             X_collection = rna_measurement.add_new_collection("X")
-            for layer_name in self.globals_.PAI_X_LAYERS.keys():
+            for layer_name, dtype in self.globals_.PAI_X_LAYERS:
                 platform_config = self.globals_.PAI_X_LAYERS_PLATFORM_CONFIG[layer_name]
                 if layer_name.startswith("row"):
                     logger.info(f"Converting row-reads tile width to {self.globals_.NUM_GENES}")
@@ -183,7 +186,7 @@ class AtlasManager(BaseModel):
 
                 X_collection.add_new_sparse_ndarray(
                     layer_name,
-                    type=self.globals_.PAI_X_LAYERS[layer_name],
+                    type=dtype,
                     shape=(None, self.globals_.NUM_GENES),
                     platform_config=platform_config,
                 )

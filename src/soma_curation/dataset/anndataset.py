@@ -9,9 +9,9 @@ from typing import List, Tuple, Union
 from typing_extensions import Self
 from pydantic import BaseModel, ConfigDict, model_validator, Field, computed_field
 from pathlib import Path
-from s3pathlib import S3Path
+from cloudpathlib import CloudPath
 
-from ..schema import DatabaseSchema
+from ..schema.objects import DatabaseSchema
 from ..sc_logging import logger
 from .standardize.funcs import normalize_raw_array
 
@@ -186,13 +186,14 @@ class AnnDataset(BaseModel):
         """
         Standardize the .obs attribute of the AnnData object.
         """
-        non_index_columns = list(self.database_schema.PAI_OBS_CELL_COLUMNS.keys()) + list(
-            self.database_schema.PAI_OBS_SAMPLE_COLUMNS.keys()
-        )
+        non_index_columns = [x[0] for x in self.database_schema.PAI_OBS_CELL_COLUMNS] + [
+            y[0] for y in self.database_schema.PAI_OBS_SAMPLE_COLUMNS
+        ]
+
         self.artifact.obs = self.artifact.obs.reindex(non_index_columns, axis=1)
-        for col in non_index_columns:
+        for col, dtype_ in self.database_schema.PAI_OBS_CELL_COLUMNS + self.database_schema.PAI_OBS_SAMPLE_COLUMNS:
             try:
-                dtype = self.database_schema.PAI_OBS_TERM_COLUMNS[col].to_pandas_dtype()
+                dtype = dtype_.to_pandas_dtype()
                 self.artifact.obs[col] = self.artifact.obs[col].fillna(None).astype(dtype)
 
             # Strings and categoricals do not have explicit pandas dtype conversions from Arrow so we have to check the exception
@@ -201,12 +202,12 @@ class AnnDataset(BaseModel):
                 series_ = self.artifact.obs[col].fillna("Unknown").astype(dtype)
 
                 # Categoricals need explicit conversion
-                if isinstance(self.database_schema.PAI_OBS_TERM_COLUMNS[col], pa.DictionaryType):
+                if isinstance(dtype_, pa.DictionaryType):
                     series_ = series_.astype("category")
 
                 self.artifact.obs[col] = series_
 
-        for col in self.database_schema.PAI_OBS_COMPUTED_COLUMNS:
+        for col, _ in self.database_schema.PAI_OBS_COMPUTED_COLUMNS:
             try:
                 func = self.database_schema.COMPUTED_COLUMN_FUNCTIONS[col]
             except Exception as e:
@@ -219,14 +220,15 @@ class AnnDataset(BaseModel):
         """
         Standardize the .var attribute of the AnnData object.
         """
-        non_index_columns = list(self.database_schema.PAI_VAR_COLUMNS.keys())
-        self.artifact.var = self.artifact.var.reindex(non_index_columns, axis=1)
-        for col in non_index_columns:
+        self.artifact.var = self.artifact.var.reindex([x[0] for x in self.database_schema.PAI_VAR_COLUMNS], axis=1)
+        for col, dtype_ in self.database_schema.PAI_VAR_COLUMNS:
             try:
-                dtype = self.database_schema.PAI_VAR_TERM_COLUMNS[col].to_pandas_dtype()
+                dtype = dtype_.to_pandas_dtype()
                 self.artifact.var[col] = self.artifact.var[col].fillna(None)
             except Exception as e:
-                logger.debug(f"Cannot standardize col {col}: {e}")
+                logger.warning(
+                    f"Cannot standardize col {col}: {e} since it does not have associated pandas dtype. Casting to string."
+                )
                 dtype = "str"
                 self.artifact.var[col] = self.artifact.var[col].fillna("").astype(dtype)
         self.artifact = self.artifact[:, self.artifact.var["gene"].isin(self.database_schema.SORTED_CORE_GENES)]
@@ -236,7 +238,7 @@ class AnnDataset(BaseModel):
         Standardize the .X attribute of the AnnData object.
         """
         del self.artifact.layers
-        for layer_name in self.database_schema.PAI_X_LAYERS:
+        for layer_name, _ in self.database_schema.PAI_X_LAYERS:
             if layer_name == "row_raw":
                 continue
             if layer_name.endswith("_raw"):
@@ -268,20 +270,20 @@ class AnnDataset(BaseModel):
 
         return presence_matrix.tocoo()
 
-    def write(self, output_filepath: Union[str, Path, S3Path]) -> Union[Path, S3Path]:
+    def write(self, output_filepath: Union[str, Path, CloudPath]) -> Union[Path, CloudPath]:
         """Write the AnnDataset to H5AD format at a specific filepath
 
         Args:
-            output_filepath (Union[str, Path, S3Path]): Needs to end with `.h5ad`
+            output_filepath (Union[str, Path, CloudPath]): Needs to end with `.h5ad`
 
         Returns:
-            Union[Path, S3Path]: Location of written H5AD object
+            Union[Path, CloudPath]: Location of written H5AD object
         """
 
         # TODO: method to deal with string path logic
         if isinstance(output_filepath, str):
             if output_filepath.startswith("s3://"):
-                output_filepath = S3Path(output_filepath)
+                output_filepath = CloudPath(output_filepath)
             else:
                 output_filepath = Path(output_filepath)
 
@@ -296,15 +298,11 @@ class AnnDataset(BaseModel):
 
         if isinstance(output_filepath, Path):
             # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
-            anndata.io.write_h5ad(
-                filepath=output_filepath, adata=self.artifact, compression="gzip", convert_strings_to_categoricals=False
-            )
-        elif isinstance(output_filepath, S3Path):
+            anndata.io.write_h5ad(filepath=output_filepath, adata=self.artifact, convert_strings_to_categoricals=False)
+        elif isinstance(output_filepath, CloudPath):
             temp_path = Path(f"/tmp/{output_filepath.basename}")
             # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
-            anndata.io.write_h5ad(
-                filepath=temp_path, adata=self.artifact, compression="gzip", convert_strings_to_categoricals=False
-            )
+            anndata.io.write_h5ad(filepath=temp_path, adata=self.artifact, convert_strings_to_categoricals=False)
             output_filepath.upload_file(temp_path, overwrite=True)
 
         return output_filepath

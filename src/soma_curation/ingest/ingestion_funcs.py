@@ -5,10 +5,8 @@ from pathlib import Path
 from tiledbsoma.io import ExperimentAmbientLabelMapping
 
 from ..sc_logging import logger
-from ..schema import SOMA_TileDB_Context, DatabaseSchema
 from ..dataset.anndataset import AnnDataset
-from ..mtx_collection.mtx_collection import MtxCollection
-from ..config.config import PipelineConfig
+from ..config.config import PipelineConfig, SOMA_TileDB_Context
 
 
 def create_registration_mapping(
@@ -57,7 +55,6 @@ def ingest_h5ad_soma(path: str, experiment_path: str, rm: ExperimentAmbientLabel
     the precomputed registration mapping.
     """
     try:
-        logger.info(f"{hex(id(rm))}")
         logger.info(f"[ingest_h5ad] Ingesting {path}")
         _ingest_h5ad_soma(
             experiment_uri=experiment_path,
@@ -78,19 +75,33 @@ def convert_and_std_mtx_to_h5ad(study_name: str, sample_name: str, pc: PipelineC
     Raises an exception if anything fails.
     """
     try:
-        logger.info(f"MTX COLL: {hex(id(pc.mtx_collection))}-{hex(id(pc.db_schema))}")
-        logger.info(f"[convert_to_h5ad] Processing study={study_name}, sample={sample_name}")
+        logger.info(f"[convert_to_h5ad] Processing study='{study_name}', sample='{sample_name}'")
         adata = pc.mtx_collection.get_anndata(study_name=study_name, sample_name=sample_name)
+    except Exception as e:
+        logger.error(
+            f"Error fetching and assembling study='{study_name}', sample='{sample_name}' from raw storage: {e}"
+        )
+        raise
+    try:
         anndataset = AnnDataset(artifact=adata, database_schema=pc.db_schema)
+    except Exception as e:
+        logger.error(f"Error converting study='{study_name}', sample='{sample_name}' to AnnDataset object: {e}")
+        raise
+
+    try:
         anndataset.standardize()
+    except Exception as e:
+        logger.error(f"Error standardizing study='{study_name}', sample='{sample_name}' to H5AD: {e}")
+        raise
+
+    try:
         # Construct the output filename
         filename = Path(pc.h5ad_storage_dir) / f"{study_name}-{sample_name}.h5ad"
         anndataset.write(filename)
-        logger.info(f"Successfully converted {study_name}-{sample_name} -> {filename}")
+        logger.info(f"Successfully converted '{study_name}'-'{sample_name}' -> '{filename}'")
         return filename.as_posix()
     except Exception as e:
-        logger.error(f"Error converting study={study_name}, sample={sample_name} to H5AD: {e}")
-        # Raise so that it goes to the executor's failure list
+        logger.error(f"Error writing study={study_name}, sample={sample_name} to H5AD: {e}")
         raise
 
 

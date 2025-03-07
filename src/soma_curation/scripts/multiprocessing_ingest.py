@@ -14,8 +14,8 @@ from ..ingest.ingestion_funcs import (
 )
 from ..atlas.crud import AtlasManager
 from ..executor.executors import MultiprocessingExecutor
-from ..mtx_collection.mtx_collection import MtxCollection
 from ..config.config import PipelineConfig
+from ..schema.load import load_schema
 
 if multiprocessing.get_start_method(True) != "spawn":
     multiprocessing.set_start_method("spawn", True)
@@ -30,18 +30,17 @@ def main():
     parser.add_argument("--raw-storage-dir", type=str, default="human", help="Path to raw storage directory.")
     parser.add_argument("--h5ad-storage-dir", type=str, default="h5ads", help="Directory to write H5AD files.")
     parser.add_argument("--atlas-storage-dir", type=str, default="./test", help="Local directory to store the atlas.")
+    parser.add_argument("--db-schema-dir", type=str, default="human", help="Organism name (if needed).")
     args = parser.parse_args()
 
-    # 1) Create a dummy structure for the raw data (if needed).
-    create_dummy_structure(args.raw_storage_dir)
-
+    # 1) Create a pipeline config
     pc = PipelineConfig(
         atlas_name=args.atlas_name,
         raw_storage_dir=args.raw_storage_dir,
         h5ad_storage_dir=args.h5ad_storage_dir,
         atlas_storage_dir=args.atlas_storage_dir,
         processes=args.processes,
-        db_schema_uri=None,
+        db_schema_uri=args.db_schema_dir,
     )
 
     # 2) Set up logging. We create a logs directory inside the atlas directory.
@@ -50,6 +49,7 @@ def main():
     _set_level(level=10, add_file_handler=True, log_dir=log_dir, log_file=f"{pc.atlas_name}.log")
 
     logger.info("Starting pipeline execution...")
+    logger.info(pc)
 
     # 5) Initialize AtlasManager
     am = AtlasManager(atlas_name=pc.atlas_name, storage_directory=pc.atlas_storage_dir, globals_=pc.db_schema)
