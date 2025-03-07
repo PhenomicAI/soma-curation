@@ -26,7 +26,8 @@ jobs:
         uses: release-drafter/release-drafter@v5
         with:
           config-name: release-drafter.yml
-          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish_package_and_docs:
     # Only run if this is a "release" event with type "published"
