@@ -5,7 +5,6 @@ import multiprocessing
 from pathlib import Path
 
 from ..sc_logging import logger, _set_level, init_worker_logging
-from ..constants import create_dummy_structure
 from ..ingest.ingestion_funcs import (
     create_registration_mapping,
     ingest_h5ad_soma,
@@ -15,7 +14,6 @@ from ..ingest.ingestion_funcs import (
 from ..atlas.crud import AtlasManager
 from ..executor.executors import MultiprocessingExecutor
 from ..config.config import PipelineConfig
-from ..schema.load import load_schema
 
 if multiprocessing.get_start_method(True) != "spawn":
     multiprocessing.set_start_method("spawn", True)
