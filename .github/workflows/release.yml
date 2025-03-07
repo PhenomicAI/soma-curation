@@ -77,8 +77,6 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
 
-          publish_pypi:
-
   publish_pypi:
     name: Publish to PyPI
     needs: [build_package]
