@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=64", "setuptools_scm[toml]>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "soma_curation"
-version = "0.0.1"
+dynamic = ["version"]
 description = "Curate data for the scTx platform"
 authors = [
     { name = "Phenomic AI", email = "sctx@phenomic.ai" }
@@ -33,6 +33,9 @@ dependencies = [
     "s3fs[boto3]",
     "cloudpathlib"
 ]
+
+[tool.setuptools_scm]
+
 
 [tool.setuptools.package-data]
 "soma_curation.constants" = [
