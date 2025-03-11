@@ -71,9 +71,6 @@ line-length = 120
 target_version = ['py310']
 
 [tool.pytest.ini_options]
-markers = [
-    "pipeline_config: test soma build pipelines",
-]
 pythonpath = [
     "." 
 ]

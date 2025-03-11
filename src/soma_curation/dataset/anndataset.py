@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, model_validator, Field, computed_fie
 from pathlib import Path
 from cloudpathlib import CloudPath
 
-from ..schema.objects import DatabaseSchema
+from ..schema import DatabaseSchema
 from ..sc_logging import logger
 from .standardize.funcs import normalize_raw_array
 
@@ -23,7 +23,7 @@ class AnnDataset(BaseModel):
     Attributes:
     - artifact: ad.AnnData
         The AnnData object containing the data matrix.
-    - database_schema: DatabaseSchema
+    - db_schema: DatabaseSchema
         The schema defining the structure and validation rules for the data.
 
     Methods:
@@ -32,7 +32,7 @@ class AnnDataset(BaseModel):
     """
 
     artifact: ad.AnnData = Field(repr=False)
-    database_schema: DatabaseSchema = Field(repr=False)
+    db_schema: DatabaseSchema = Field(repr=False)
     standardized: bool = Field(default=False)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -74,9 +74,9 @@ class AnnDataset(BaseModel):
             return
 
         assert (
-            "barcode" in self.database_schema.VALIDATION_SCHEMA.REQUIRED_OBS_COLUMNS
+            "barcode" in self.db_schema.VALIDATION_SCHEMA.REQUIRED_OBS_COLUMNS
         ), "barcode needs to be present in required obs columns"
-        for col in self.database_schema.VALIDATION_SCHEMA.REQUIRED_OBS_COLUMNS:
+        for col in self.db_schema.VALIDATION_SCHEMA.REQUIRED_OBS_COLUMNS:
             if col not in self.artifact.obs:
                 errors.append(f"Missing col in obs: `{col}`")
             else:
@@ -96,13 +96,13 @@ class AnnDataset(BaseModel):
             List to collect error messages.
         """
         assert (
-            "gene" in self.database_schema.VALIDATION_SCHEMA.REQUIRED_VAR_COLUMNS
+            "gene" in self.db_schema.VALIDATION_SCHEMA.REQUIRED_VAR_COLUMNS
         ), "Gene needs to be present in required var columns"
         if not hasattr(self.artifact, "var"):
             errors.append("AnnData missing .var attribute")
             return
 
-        for col in self.database_schema.VALIDATION_SCHEMA.REQUIRED_VAR_COLUMNS:
+        for col in self.db_schema.VALIDATION_SCHEMA.REQUIRED_VAR_COLUMNS:
             if col not in self.artifact.var:
                 errors.append(f"Missing col in var: `{col}`")
             else:
@@ -118,12 +118,12 @@ class AnnDataset(BaseModel):
             errors.append("Gene not in .var attribute")
             return
         genes = set(self.artifact.var["gene"])
-        intersection = len(self.database_schema.CORE_GENES.intersection(genes)) / len(self.database_schema.CORE_GENES)
+        intersection = len(self.db_schema.CORE_GENES.intersection(genes)) / len(self.db_schema.CORE_GENES)
         # Sometimes you might want to explcitly set this to 0 for testing purposes
-        if self.database_schema.VALIDATION_SCHEMA.GENE_INTERSECTION_THRESHOLD_FRAC > 0:
-            if intersection < self.database_schema.VALIDATION_SCHEMA.GENE_INTERSECTION_THRESHOLD_FRAC:
+        if self.db_schema.VALIDATION_SCHEMA.GENE_INTERSECTION_THRESHOLD_FRAC > 0:
+            if intersection < self.db_schema.VALIDATION_SCHEMA.GENE_INTERSECTION_THRESHOLD_FRAC:
                 errors.append(
-                    f"Gene intersection >= {self.database_schema.VALIDATION_SCHEMA.GENE_INTERSECTION_THRESHOLD_FRAC} required"
+                    f"Gene intersection >= {self.db_schema.VALIDATION_SCHEMA.GENE_INTERSECTION_THRESHOLD_FRAC} required"
                 )
         else:
             pass
@@ -186,12 +186,12 @@ class AnnDataset(BaseModel):
         """
         Standardize the .obs attribute of the AnnData object.
         """
-        non_index_columns = [x[0] for x in self.database_schema.PAI_OBS_CELL_COLUMNS] + [
-            y[0] for y in self.database_schema.PAI_OBS_SAMPLE_COLUMNS
+        non_index_columns = [x[0] for x in self.db_schema.PAI_OBS_CELL_COLUMNS] + [
+            y[0] for y in self.db_schema.PAI_OBS_SAMPLE_COLUMNS
         ]
 
         self.artifact.obs = self.artifact.obs.reindex(non_index_columns, axis=1)
-        for col, dtype_ in self.database_schema.PAI_OBS_CELL_COLUMNS + self.database_schema.PAI_OBS_SAMPLE_COLUMNS:
+        for col, dtype_ in self.db_schema.PAI_OBS_CELL_COLUMNS + self.db_schema.PAI_OBS_SAMPLE_COLUMNS:
             try:
                 dtype = dtype_.to_pandas_dtype()
                 self.artifact.obs[col] = self.artifact.obs[col].fillna(None).astype(dtype)
@@ -207,9 +207,9 @@ class AnnDataset(BaseModel):
 
                 self.artifact.obs[col] = series_
 
-        for col, _ in self.database_schema.PAI_OBS_COMPUTED_COLUMNS:
+        for col, _ in self.db_schema.PAI_OBS_COMPUTED_COLUMNS:
             try:
-                func = self.database_schema.COMPUTED_COLUMN_FUNCTIONS[col]
+                func = self.db_schema.COMPUTED_COLUMN_FUNCTIONS[col]
             except Exception as e:
                 logger.warning(f"Computation function for {col} not found, skipping, {e}...")
                 continue
@@ -220,8 +220,8 @@ class AnnDataset(BaseModel):
         """
         Standardize the .var attribute of the AnnData object.
         """
-        self.artifact.var = self.artifact.var.reindex([x[0] for x in self.database_schema.PAI_VAR_COLUMNS], axis=1)
-        for col, dtype_ in self.database_schema.PAI_VAR_COLUMNS:
+        self.artifact.var = self.artifact.var.reindex([x[0] for x in self.db_schema.PAI_VAR_COLUMNS], axis=1)
+        for col, dtype_ in self.db_schema.PAI_VAR_COLUMNS:
             try:
                 dtype = dtype_.to_pandas_dtype()
                 self.artifact.var[col] = self.artifact.var[col].fillna(None)
@@ -231,14 +231,14 @@ class AnnDataset(BaseModel):
                 )
                 dtype = "str"
                 self.artifact.var[col] = self.artifact.var[col].fillna("").astype(dtype)
-        self.artifact = self.artifact[:, self.artifact.var["gene"].isin(self.database_schema.SORTED_CORE_GENES)]
+        self.artifact = self.artifact[:, self.artifact.var["gene"].isin(self.db_schema.SORTED_CORE_GENES)]
 
     def _standardize_X(self):
         """
         Standardize the .X attribute of the AnnData object.
         """
         del self.artifact.layers
-        for layer_name, _ in self.database_schema.PAI_X_LAYERS:
+        for layer_name, _ in self.db_schema.PAI_X_LAYERS:
             if layer_name == "row_raw":
                 continue
             if layer_name.endswith("_raw"):
@@ -258,12 +258,12 @@ class AnnDataset(BaseModel):
         """
         temp_var = self.artifact.var.copy()
         temp_var["presence"] = True
-        merged = pd.merge(self.database_schema.VAR_DF, temp_var, on="gene", how="left")
+        merged = pd.merge(self.db_schema.VAR_DF, temp_var, on="gene", how="left")
         index = merged.index[~merged["presence"].isna()]
 
         presence_matrix = sp.lil_matrix(
             (self.artifact.obs["sample_name"].nunique(), len(merged)),
-            dtype=self.database_schema.PAI_PRESENCE_LAYER.to_pandas_dtype(),
+            dtype=self.db_schema.PAI_PRESENCE_LAYER.to_pandas_dtype(),
         )
 
         presence_matrix[:, index] = 1
@@ -294,15 +294,15 @@ class AnnDataset(BaseModel):
         output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
         if output_filepath.exists():
-            logger.info(f"H5AD exists at {output_filepath.as_posix()}, overwriting...")
+            logger.info(f"H5AD exists at {output_filepath.as_uri()}, overwriting...")
 
         if isinstance(output_filepath, Path):
             # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
             anndata.io.write_h5ad(filepath=output_filepath, adata=self.artifact, convert_strings_to_categoricals=False)
         elif isinstance(output_filepath, CloudPath):
-            temp_path = Path(f"/tmp/{output_filepath.basename}")
+            temp_path = Path(f"/tmp/{output_filepath.name}")
             # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
             anndata.io.write_h5ad(filepath=temp_path, adata=self.artifact, convert_strings_to_categoricals=False)
-            output_filepath.upload_file(temp_path, overwrite=True)
+            output_filepath.upload_from(temp_path, force_overwrite_to_cloud=True)
 
         return output_filepath

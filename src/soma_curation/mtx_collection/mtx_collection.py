@@ -8,7 +8,7 @@ from typing import List, Tuple, Optional, Union, Generator
 from fast_matrix_market import mmread
 from cloudpathlib import CloudPath
 
-from ..schema.objects import DatabaseSchema
+from ..schema import DatabaseSchema
 from ..sc_logging import logger
 
 

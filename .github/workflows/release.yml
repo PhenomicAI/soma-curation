@@ -4,10 +4,8 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*.*.*"
   pull_request:
-    types: [closed]
+    types: [opened, synchronize, reopened]
   release:
     types: [published]
 
@@ -16,8 +14,27 @@ permissions:
   id-token: write
 
 jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: pytest
+
   draft_release:
     if: github.event_name != 'release'
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -31,6 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build_package:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -57,14 +75,12 @@ jobs:
     name: Publish to TestPyPI
     needs: [build_package]
     runs-on: ubuntu-latest
-
     environment:
       name: testpypi
       url: https://test.pypi.org/project/soma-curation/
     permissions:
       id-token: write
-
-    if: contains(github.ref_name, '-rc')
+    if: github.event_name == 'release' && github.event.release.prerelease == true
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -81,15 +97,12 @@ jobs:
     name: Publish to PyPI
     needs: [build_package]
     runs-on: ubuntu-latest
-
     environment:
       name: pypi
       url: https://pypi.org/project/soma-curation/
     permissions:
       id-token: write
-
-    if: startsWith(github.ref, 'refs/tags/') && ! contains(github.ref_name, '-rc')
-
+    if: github.event_name == 'release' && github.event.release.prerelease == false
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -104,7 +117,6 @@ jobs:
     name: Deploy Docs
     needs: [publish_pypi]
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

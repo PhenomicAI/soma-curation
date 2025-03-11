@@ -5,8 +5,7 @@ from functools import lru_cache
 from typing import Optional
 
 from ..mtx_collection.mtx_collection import MtxCollection
-from ..schema.objects import DatabaseSchema
-from ..schema.load import load_schema
+from ..schema import DatabaseSchema, load_schema
 
 
 DEFAULT_TILEDB_CONFIG = {
@@ -50,9 +49,6 @@ class PipelineConfig(BaseModel):
     @computed_field(repr=False)
     @property
     def db_schema(self) -> DatabaseSchema:
-        if not self.db_schema_uri:
-            # Optionally: return the default schema if no URI provided
-            return load_schema(None)
         return load_schema(self.db_schema_uri)
 
     @computed_field

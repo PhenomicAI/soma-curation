@@ -3,13 +3,13 @@ import shutil
 import tiledbsoma as soma
 
 from datetime import datetime, timezone
-from pydantic import BaseModel, Field, computed_field, ConfigDict, AfterValidator
+from pydantic import BaseModel, Field, computed_field, ConfigDict, AfterValidator, model_validator
 from pathlib import Path
-from typing import Union, Generator
+from typing import Union, Generator, Optional
 from contextlib import contextmanager
 from typing_extensions import Annotated
 
-from ..schema.objects import DatabaseSchema
+from ..schema import DatabaseSchema
 from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
 from ..config.config import SOMA_TileDB_Context
@@ -21,7 +21,7 @@ def expand_paths(value: Union[str, Path]) -> Path:
     return value.expanduser()
 
 
-ExpandedPath = Annotated[str, AfterValidator(expand_paths)]
+ExpandedPath = Annotated[Union[str, Path], AfterValidator(expand_paths)]
 
 
 class AtlasManager(BaseModel):
@@ -31,7 +31,7 @@ class AtlasManager(BaseModel):
     Attributes:
     - atlas_name: str
         The name of the atlas.
-    - globals_: DatabaseSchema
+    - db_schema: DatabaseSchema
         The schema defining the structure and validation rules for the data.
     - storage_directory: Path
         The directory where the atlas is stored.
@@ -46,10 +46,39 @@ class AtlasManager(BaseModel):
 
     atlas_name: str
     storage_directory: ExpandedPath
-    globals_: DatabaseSchema = Field(repr=False)
+    db_schema: Optional[DatabaseSchema] = Field(default=None, repr=False)
     context: soma.SOMATileDBContext = Field(default_factory=SOMA_TileDB_Context, repr=False)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def load_schema_if_missing(cls, v, info):
+        """
+        If no schema is provided and the atlas exists, load the schema from experiment metadata.
+        Otherwise, if the atlas does not exist and no schema is provided, raise an error.
+        """
+        if v is not None:
+            return v
+
+        values = info.data
+        storage_directory = values.get("storage_directory")
+        atlas_name = values.get("atlas_name")
+        context = values.get("context")
+        if storage_directory is None or atlas_name is None:
+            raise ValueError("Both storage_directory and atlas_name must be provided.")
+        exp_path = Path(storage_directory).expanduser() / atlas_name
+        if exp_path.exists():
+            try:
+                with soma.Experiment.open(exp_path.as_posix(), context=context, mode="r") as exp:
+                    schema_json = exp.metadata.get("db_schema")
+                    if schema_json is None:
+                        raise ValueError("No schema stored in experiment metadata.")
+                    return DatabaseSchema(**schema_json)
+            except Exception as e:
+                raise ValueError(f"Error loading schema from experiment: {e}")
+        else:
+            raise ValueError("Atlas does not exist and no db_schema was provided.")
 
     @computed_field(repr=False)
     @property
@@ -123,7 +152,7 @@ class AtlasManager(BaseModel):
 
         with soma.Experiment.create(self.experiment_path.as_posix(), context=self.context) as experiment:
             experiment.metadata["created_on"] = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
-            experiment.metadata["pai_schema_version"] = self.globals_.PAI_SCHEMA_VERSION
+            experiment.metadata["pai_schema_version"] = self.db_schema.PAI_SCHEMA_VERSION
 
             experiment.metadata["pai_soma_object_version"] = self.version
 
@@ -133,71 +162,71 @@ class AtlasManager(BaseModel):
 
             # create `obs`
             obs_schema = pa.schema(
-                self.globals_.PAI_OBS_TERM_COLUMNS,
+                self.db_schema.PAI_OBS_TERM_COLUMNS,
                 metadata={
                     k: "nullable"
                     for k in (
-                        [x[0] for x in self.globals_.PAI_OBS_SAMPLE_COLUMNS]
-                        + [x[0] for x in self.globals_.PAI_OBS_CELL_COLUMNS]
-                        + [x[0] for x in self.globals_.PAI_OBS_COMPUTED_COLUMNS]
+                        [x[0] for x in self.db_schema.PAI_OBS_SAMPLE_COLUMNS]
+                        + [x[0] for x in self.db_schema.PAI_OBS_CELL_COLUMNS]
+                        + [x[0] for x in self.db_schema.PAI_OBS_COMPUTED_COLUMNS]
                     )
                 },
             )
             experiment.add_new_dataframe(
                 "obs",
                 schema=obs_schema,
-                index_column_names=[x[0] for x in self.globals_.PAI_OBS_INDEX_COLUMNS],
-                platform_config=self.globals_.PAI_OBS_PLATFORM_CONFIG,
+                index_column_names=[x[0] for x in self.db_schema.PAI_OBS_INDEX_COLUMNS],
+                platform_config=self.db_schema.PAI_OBS_PLATFORM_CONFIG,
             )
 
             # create `ms`
             measurements = experiment.add_new_collection("ms")
 
             # Create RNA measurements
-            rna_measurement = measurements.add_new_collection(self.globals_.MEASUREMENT_RNA_NAME, soma.Measurement)
+            rna_measurement = measurements.add_new_collection(self.db_schema.MEASUREMENT_RNA_NAME, soma.Measurement)
 
             # create empty `obsm` collection in the measurement
             rna_measurement.add_new_collection("obsm")
 
             # create `var` in the measurement
-            var_schema = pa.schema(self.globals_.PAI_VAR_TERM_COLUMNS)
+            var_schema = pa.schema(self.db_schema.PAI_VAR_TERM_COLUMNS)
             var = rna_measurement.add_new_dataframe(
                 "var",
                 schema=var_schema,
-                index_column_names=[x[0] for x in self.globals_.PAI_VAR_INDEX_COLUMNS],
-                platform_config=self.globals_.PAI_VAR_PLATFORM_CONFIG,
-                domain=[[0, len(self.globals_.VAR_DF) - 1]],
+                index_column_names=[x[0] for x in self.db_schema.PAI_VAR_INDEX_COLUMNS],
+                platform_config=self.db_schema.PAI_VAR_PLATFORM_CONFIG,
+                domain=[[0, len(self.db_schema.VAR_DF) - 1]],
             )
 
             # TODO: clean this little issue here
-            assert set([x[0] for x in self.globals_.PAI_VAR_COLUMNS]) == set(
+            assert set([x[0] for x in self.db_schema.PAI_VAR_COLUMNS]) == set(
                 ["gene", "ens"]
             ), "Make sure that your var df aligns"
-            table = pa.Table.from_pandas(self.globals_.VAR_DF, preserve_index=False)
+            table = pa.Table.from_pandas(self.db_schema.VAR_DF, preserve_index=False)
             var.write(table)
 
             # create `X` in the measurement
             X_collection = rna_measurement.add_new_collection("X")
-            for layer_name, dtype in self.globals_.PAI_X_LAYERS:
-                platform_config = self.globals_.PAI_X_LAYERS_PLATFORM_CONFIG[layer_name]
+            for layer_name, dtype in self.db_schema.PAI_X_LAYERS:
+                platform_config = self.db_schema.PAI_X_LAYERS_PLATFORM_CONFIG[layer_name]
                 if layer_name.startswith("row"):
-                    logger.info(f"Converting row-reads tile width to {self.globals_.NUM_GENES}")
-                    platform_config["tiledb"]["create"]["dims"]["soma_dim_1"]["tile"] = self.globals_.NUM_GENES
+                    logger.info(f"Converting row-reads tile width to {self.db_schema.NUM_GENES}")
+                    platform_config["tiledb"]["create"]["dims"]["soma_dim_1"]["tile"] = self.db_schema.NUM_GENES
 
                 X_collection.add_new_sparse_ndarray(
                     layer_name,
                     type=dtype,
-                    shape=(None, self.globals_.NUM_GENES),
+                    shape=(None, self.db_schema.NUM_GENES),
                     platform_config=platform_config,
                 )
 
-            logger.info(f"Converting presence tile width to {self.globals_.NUM_GENES}")
-            platform_config = self.globals_.PAI_PRESENCE_PLATFORM_CONFIG
-            platform_config["tiledb"]["create"]["dims"]["soma_dim_1"]["tile"] = self.globals_.NUM_GENES
+            logger.info(f"Converting presence tile width to {self.db_schema.NUM_GENES}")
+            platform_config = self.db_schema.PAI_PRESENCE_PLATFORM_CONFIG
+            platform_config["tiledb"]["create"]["dims"]["soma_dim_1"]["tile"] = self.db_schema.NUM_GENES
             rna_measurement.add_new_sparse_ndarray(
-                self.globals_.PAI_PRESENCE_MATRIX_NAME,
-                type=self.globals_.PAI_PRESENCE_LAYER,
-                shape=(None, self.globals_.NUM_GENES),
+                self.db_schema.PAI_PRESENCE_MATRIX_NAME,
+                type=self.db_schema.PAI_PRESENCE_LAYER,
+                shape=(None, self.db_schema.NUM_GENES),
                 platform_config=platform_config,
             )
 

@@ -25,10 +25,10 @@ def main():
         "--processes", type=int, default=4, help="Number of worker processes to use for parallel tasks."
     )
     parser.add_argument("--atlas-name", type=str, default="test", help="Name of the atlas.")
-    parser.add_argument("--raw-storage-dir", type=str, default="human", help="Path to raw storage directory.")
+    parser.add_argument("--raw-storage-dir", type=str, default="human", help="Directory to raw storage.")
     parser.add_argument("--h5ad-storage-dir", type=str, default="h5ads", help="Directory to write H5AD files.")
-    parser.add_argument("--atlas-storage-dir", type=str, default="./test", help="Local directory to store the atlas.")
-    parser.add_argument("--db-schema-dir", type=str, default="human", help="Organism name (if needed).")
+    parser.add_argument("--atlas-storage-dir", type=str, default="./test", help="Directory to store the atlas.")
+    parser.add_argument("--db-schema-fp", type=str, default=None, help="Filepath for database schema.")
     args = parser.parse_args()
 
     # 1) Create a pipeline config
@@ -38,7 +38,7 @@ def main():
         h5ad_storage_dir=args.h5ad_storage_dir,
         atlas_storage_dir=args.atlas_storage_dir,
         processes=args.processes,
-        db_schema_uri=args.db_schema_dir,
+        db_schema_uri=args.db_schema_fp,
     )
 
     # 2) Set up logging. We create a logs directory inside the atlas directory.
@@ -50,7 +50,7 @@ def main():
     logger.info(pc)
 
     # 5) Initialize AtlasManager
-    am = AtlasManager(atlas_name=pc.atlas_name, storage_directory=pc.atlas_storage_dir, globals_=pc.db_schema)
+    am = AtlasManager(atlas_name=pc.atlas_name, storage_directory=pc.atlas_storage_dir, db_schema=pc.db_schema)
 
     if am.exists():
         raise ValueError(f"Atlas '{args.atlas_name}' already exists, aborting.")

@@ -1,6 +1,7 @@
 import tiledbsoma.io
 
 from typing import List, Literal
+from cloudpathlib import AnyPath
 from pathlib import Path
 from tiledbsoma.io import ExperimentAmbientLabelMapping
 
@@ -83,7 +84,7 @@ def convert_and_std_mtx_to_h5ad(study_name: str, sample_name: str, pc: PipelineC
         )
         raise
     try:
-        anndataset = AnnDataset(artifact=adata, database_schema=pc.db_schema)
+        anndataset = AnnDataset(artifact=adata, db_schema=pc.db_schema)
     except Exception as e:
         logger.error(f"Error converting study='{study_name}', sample='{sample_name}' to AnnDataset object: {e}")
         raise
@@ -96,10 +97,10 @@ def convert_and_std_mtx_to_h5ad(study_name: str, sample_name: str, pc: PipelineC
 
     try:
         # Construct the output filename
-        filename = Path(pc.h5ad_storage_dir) / f"{study_name}-{sample_name}.h5ad"
+        filename = AnyPath(pc.h5ad_storage_dir) / f"{study_name}-{sample_name}.h5ad"
         anndataset.write(filename)
         logger.info(f"Successfully converted '{study_name}'-'{sample_name}' -> '{filename}'")
-        return filename.as_posix()
+        return filename.as_posix() if isinstance(filename, Path) else filename.as_uri()
     except Exception as e:
         logger.error(f"Error writing study={study_name}, sample={sample_name} to H5AD: {e}")
         raise
