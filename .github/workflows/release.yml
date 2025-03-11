@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*.*.*"
   pull_request:
     types: [closed]
   release:
@@ -57,14 +55,12 @@ jobs:
     name: Publish to TestPyPI
     needs: [build_package]
     runs-on: ubuntu-latest
-
     environment:
       name: testpypi
       url: https://test.pypi.org/project/soma-curation/
     permissions:
       id-token: write
-
-    if: contains(github.ref_name, '-rc')
+    if: github.event_name == 'release' && github.event.release.prerelease == true
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -81,15 +77,12 @@ jobs:
     name: Publish to PyPI
     needs: [build_package]
     runs-on: ubuntu-latest
-
     environment:
       name: pypi
       url: https://pypi.org/project/soma-curation/
     permissions:
       id-token: write
-
-    if: startsWith(github.ref, 'refs/tags/') && ! contains(github.ref_name, '-rc')
-
+    if: github.event_name == 'release' && github.event.release.prerelease == false
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -104,7 +97,6 @@ jobs:
     name: Deploy Docs
     needs: [publish_pypi]
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
