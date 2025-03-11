@@ -294,15 +294,15 @@ class AnnDataset(BaseModel):
         output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
         if output_filepath.exists():
-            logger.info(f"H5AD exists at {output_filepath.as_posix()}, overwriting...")
+            logger.info(f"H5AD exists at {output_filepath.as_uri()}, overwriting...")
 
         if isinstance(output_filepath, Path):
             # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
             anndata.io.write_h5ad(filepath=output_filepath, adata=self.artifact, convert_strings_to_categoricals=False)
         elif isinstance(output_filepath, CloudPath):
-            temp_path = Path(f"/tmp/{output_filepath.basename}")
+            temp_path = Path(f"/tmp/{output_filepath.name}")
             # Strings to categoricals needs to be false so we ensure data is saved in the same way that it started as
             anndata.io.write_h5ad(filepath=temp_path, adata=self.artifact, convert_strings_to_categoricals=False)
-            output_filepath.upload_file(temp_path, overwrite=True)
+            output_filepath.upload_from(temp_path, force_overwrite_to_cloud=True)
 
         return output_filepath
