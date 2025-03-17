@@ -39,6 +39,7 @@ class PipelineConfig(BaseModel):
     h5ad_storage_dir: str
     raw_storage_dir: str
     atlas_storage_dir: str
+    log_dir: str
 
     db_schema_uri: Optional[str] = None
 

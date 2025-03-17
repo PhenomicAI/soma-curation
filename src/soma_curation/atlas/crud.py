@@ -4,7 +4,7 @@ import tiledbsoma as soma
 
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, computed_field, ConfigDict, AfterValidator, model_validator
-from pathlib import Path
+from cloudpathlib import AnyPath
 from typing import Union, Generator, Optional
 from contextlib import contextmanager
 from typing_extensions import Annotated
@@ -15,13 +15,13 @@ from ..sc_logging import logger
 from ..config.config import SOMA_TileDB_Context
 
 
-def expand_paths(value: Union[str, Path]) -> Path:
+def expand_paths(value: Union[str, AnyPath]) -> AnyPath:
     if isinstance(value, str):
-        value = Path(value)
-    return value.expanduser()
+        value = AnyPath(value)
+    return value
 
 
-ExpandedPath = Annotated[Union[str, Path], AfterValidator(expand_paths)]
+ExpandedPath = Annotated[Union[str, AnyPath], AfterValidator(expand_paths)]
 
 
 class AtlasManager(BaseModel):
@@ -67,10 +67,10 @@ class AtlasManager(BaseModel):
         context = values.get("context")
         if storage_directory is None or atlas_name is None:
             raise ValueError("Both storage_directory and atlas_name must be provided.")
-        exp_path = Path(storage_directory).expanduser() / atlas_name
+        exp_path = AnyPath(storage_directory) / atlas_name
         if exp_path.exists():
             try:
-                with soma.Experiment.open(exp_path.as_posix(), context=context, mode="r") as exp:
+                with soma.Experiment.open(str(exp_path), context=context, mode="r") as exp:
                     schema_json = exp.metadata.get("db_schema")
                     if schema_json is None:
                         raise ValueError("No schema stored in experiment metadata.")
@@ -82,7 +82,7 @@ class AtlasManager(BaseModel):
 
     @computed_field(repr=False)
     @property
-    def experiment_path(self) -> Path:
+    def experiment_path(self) -> AnyPath:
         """
         Compute the path to the experiment directory.
 
@@ -94,7 +94,7 @@ class AtlasManager(BaseModel):
 
     @computed_field(repr=True)
     @property
-    def version(self) -> Path:
+    def version(self) -> str:
         """
         Compute the path to the experiment directory.
 
@@ -113,7 +113,7 @@ class AtlasManager(BaseModel):
 
     @contextmanager
     def open(self, **kwargs) -> Generator[soma.Experiment, None, None]:
-        yield soma.Experiment.open(self.experiment_path.as_posix(), context=self.context, **kwargs)
+        yield soma.Experiment.open(str(self.experiment_path), context=self.context, **kwargs)
 
     def exists(self) -> bool:
         """
@@ -146,11 +146,11 @@ class AtlasManager(BaseModel):
             )
             return None
         else:
-            if not self.storage_directory.expanduser().exists():
-                self.storage_directory.expanduser().mkdir()
+            if not self.storage_directory.exists():
+                self.storage_directory.mkdir()
         logger.info(f"Creating atlas {self.atlas_name} in directory {self.storage_directory}...")
 
-        with soma.Experiment.create(self.experiment_path.as_posix(), context=self.context) as experiment:
+        with soma.Experiment.create(str(self.experiment_path), context=self.context) as experiment:
             experiment.metadata["created_on"] = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
             experiment.metadata["pai_schema_version"] = self.db_schema.PAI_SCHEMA_VERSION
 
