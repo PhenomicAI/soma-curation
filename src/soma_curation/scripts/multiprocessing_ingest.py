@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--h5ad-storage-dir", type=str, default="h5ads", help="Directory to write H5AD files.")
     parser.add_argument("--atlas-storage-dir", type=str, default="./test", help="Directory to store the atlas.")
     parser.add_argument("--db-schema-fp", type=str, default=None, help="Filepath for database schema.")
+    parser.add_argument("--log-dir", type=str, default="./logs", help="Directory to store logs.")
     args = parser.parse_args()
 
     # 1) Create a pipeline config
@@ -39,10 +40,11 @@ def main():
         atlas_storage_dir=args.atlas_storage_dir,
         processes=args.processes,
         db_schema_uri=args.db_schema_fp,
+        log_dir=args.log_dir,
     )
 
     # 2) Set up logging. We create a logs directory inside the atlas directory.
-    log_dir = Path(pc.atlas_storage_dir) / "logs"
+    log_dir = Path(pc.log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
     _set_level(level=10, add_file_handler=True, log_dir=log_dir, log_file=f"{pc.atlas_name}.log")
 
@@ -93,7 +95,7 @@ def main():
     # SERIAL STEP: Create registration mapping
     # ---------------------------------------------------------------------
     logger.info("Creating registration mapping (serial step)...")
-    rm = create_registration_mapping(experiment_uri=am.experiment_path.as_posix(), filenames=filenames)
+    rm = create_registration_mapping(experiment_uri=str(am.experiment_path), filenames=filenames)
     with open("rm.pkl", "wb") as f:
         pickle.dump(rm, f)
     logger.info("Registration mapping created and saved to rm.pkl.")
@@ -104,7 +106,7 @@ def main():
     logger.info("Resizing experiment (serial step)...")
     with open("rm.pkl", "rb") as f:
         rm = pickle.load(f)
-    resize_experiment(am.experiment_path.as_posix(), registration_mapping=rm)
+    resize_experiment(str(am.experiment_path), registration_mapping=rm)
     logger.info("Experiment resized successfully.")
 
     # ---------------------------------------------------------------------
@@ -112,7 +114,7 @@ def main():
     # ---------------------------------------------------------------------
 
     logger.info("Starting parallel ingestion of H5AD files into experiment...")
-    tasks_for_ingestion = [(fname, am.experiment_path.as_posix(), rm) for fname in filenames]
+    tasks_for_ingestion = [(fname, str(am.experiment_path), rm) for fname in filenames]
     ingest_result = mp_executor.run(tasks_for_ingestion, ingest_h5ad_soma)
     logger.info(
         f"Ingestion complete. {ingest_result.num_successes} successes, " f"{ingest_result.num_failures} failures."
