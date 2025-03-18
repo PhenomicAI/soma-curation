@@ -46,15 +46,11 @@ def patch_ingest(monkeypatch):
         "src.soma_curation.ingest.ingestion_funcs.resize_experiment",
         lambda experiment_uri, registration_mapping: None,
     )
-    # The convert_and_std_mtx_to_h5ad and ingest_h5ad_soma functions are invoked via the executor,
-    # so we don't need to patch them separately here.
 
 
 # Patch any function that creates a dummy data structure if needed.
 @pytest.fixture
 def patch_dummy_structure(monkeypatch):
-    # For example, if PipelineConfig or another module calls a function to create dummy raw data structure,
-    # you can override it here. If not needed, this fixture can be empty.
     monkeypatch.setattr("src.soma_curation.constants.create_dummy_structure", lambda raw_storage_dir: None)
 
 
@@ -73,6 +69,8 @@ def test_pipeline_run(tmp_path, monkeypatch, dummy_mtx_collection, patch_executo
     h5ad_storage_dir.mkdir()
     atlas_storage_dir = tmp_path / "atlas_storage"
     atlas_storage_dir.mkdir()
+    rm_storage_fp = tmp_path / "rm.pkl"
+    filenames_storage_fp = tmp_path / "filenames.pkl"
 
     # Build command-line arguments for the pipeline.
     args = [
@@ -87,6 +85,10 @@ def test_pipeline_run(tmp_path, monkeypatch, dummy_mtx_collection, patch_executo
         str(h5ad_storage_dir),
         "--atlas-storage-dir",
         str(atlas_storage_dir),
+        "--registration-mapping-pkl",
+        str(rm_storage_fp),
+        "--filenames-pkl",
+        str(filenames_storage_fp),
     ]
     monkeypatch.setattr(sys, "argv", args)
 
@@ -100,12 +102,11 @@ def test_pipeline_run(tmp_path, monkeypatch, dummy_mtx_collection, patch_executo
     assert am.exists(), "Atlas should have been created."
 
     # Verify that the registration mapping file was created.
-    rm_file = Path("rm.pkl")
-    assert rm_file.exists(), "Registration mapping file rm.pkl should exist."
+    assert rm_storage_fp.is_file(), "Registration mapping file rm.pkl should exist."
 
-    with rm_file.open("rb") as f:
+    with rm_storage_fp.open("rb") as f:
         rm = pickle.load(f)
     assert rm == {"dummy": "value"}, "Registration mapping contents do not match expected dummy value."
 
     # Clean up the registration mapping file.
-    rm_file.unlink()
+    rm_storage_fp.unlink()

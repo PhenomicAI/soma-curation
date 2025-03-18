@@ -41,6 +41,9 @@ class PipelineConfig(BaseModel):
     atlas_storage_dir: str
     log_dir: str
 
+    filenames_pickle: Optional[str] = "filenames.pkl"
+    registration_mapping_pickle: Optional[str] = "rm.pkl"
+
     db_schema_uri: Optional[str] = None
 
     processes: int = 4
