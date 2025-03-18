@@ -71,9 +71,8 @@ def main():
     # 5) Initialize AtlasManager
     am = AtlasManager(atlas_name=pc.atlas_name, storage_directory=pc.atlas_storage_dir, db_schema=pc.db_schema)
 
-    if am.exists():
-        raise ValueError(f"Atlas '{args.atlas_name}' already exists, aborting.")
-    am.create()
+    if not am.exists():
+        am.create()
 
     # ---------------------------------------------------------------------
     # STEP (1): Convert each study-sample into H5AD
@@ -110,8 +109,6 @@ def main():
 
         if not filenames:
             logger.error("No files were successfully converted; exiting early.")
-            logger.error("Deleting atlas and exiting.")
-            am.delete()
             sys.exit(1)
 
         # Save the successfully converted filenames to pickle
@@ -147,6 +144,11 @@ def main():
 
     logger.info("Starting parallel ingestion of H5AD files into experiment...")
     tasks_for_ingestion = [(fname, str(am.experiment_path), rm) for fname in filenames]
+    mp_executor = MultiprocessingExecutor(
+        processes=pc.processes,
+        init_worker_logging=init_worker_logging,
+        init_args=(10, log_dir.as_posix(), f"{pc.atlas_name}.log"),
+    )
     ingest_result = mp_executor.run(tasks_for_ingestion, ingest_h5ad_soma)
     logger.info(
         f"Ingestion complete. {ingest_result.num_successes} successes, " f"{ingest_result.num_failures} failures."
