@@ -18,12 +18,16 @@ DEFAULT_DATABASE_SCHEMA_DICT = {
         ("umi_counts", "uint32"),
         ("pct_mito", "float32"),
         ("pct_ribo", "float32"),
+        ("log_mean", "float32"),
+        ("log_var", "float32"),
     ],
     "COMPUTED_COLUMN_FUNCTIONS": {
         "nnz": "compute_nnz",
         "umi_counts": "compute_umi_counts",
         "pct_mito": "compute_pct_mito",
         "pct_ribo": "compute_pct_ribo",
+        "log_mean": "compute_log_mean",
+        "log_var": "compute_log_var",
     },
     "PAI_VAR_INDEX_COLUMNS": [("soma_joinid", "int64")],
     "PAI_VAR_COLUMNS": [

@@ -10,9 +10,15 @@ from contextlib import contextmanager
 from typing_extensions import Annotated
 
 from ..schema import DatabaseSchema
-from ..utils.git_utils import get_git_commit_sha
 from ..sc_logging import logger
 from ..config.config import SOMA_TileDB_Context
+
+try:
+    from importlib.metadata import version as get_version
+
+    PACKAGE_VERSION = get_version("soma_curation")
+except Exception:
+    PACKAGE_VERSION = "1.0"
 
 
 def expand_paths(value: Union[str, AnyPath]) -> AnyPath:
@@ -96,20 +102,20 @@ class AtlasManager(BaseModel):
     @property
     def version(self) -> str:
         """
-        Compute the path to the experiment directory.
+        Compute the version
 
         Returns:
         - Path
-            The path to the experiment directory.
+            The version
         """
         if self.exists():
             with self.open(mode="r") as exp:
                 if "pai_soma_object_version" in exp.metadata:
                     return exp.metadata["pai_soma_object_version"]
                 else:
-                    return "v1.0"
+                    return PACKAGE_VERSION
         else:
-            return "v1.0"
+            return PACKAGE_VERSION
 
     @contextmanager
     def open(self, **kwargs) -> Generator[soma.Experiment, None, None]:
@@ -153,11 +159,7 @@ class AtlasManager(BaseModel):
         with soma.Experiment.create(str(self.experiment_path), context=self.context) as experiment:
             experiment.metadata["created_on"] = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
             experiment.metadata["pai_schema_version"] = self.db_schema.PAI_SCHEMA_VERSION
-
-            experiment.metadata["pai_soma_object_version"] = self.version
-
-            sha = get_git_commit_sha()
-            experiment.metadata["git_commit_sha"] = sha
+            experiment.metadata["soma_curation_version"] = self.version
             experiment.metadata["atlas_name"] = self.atlas_name
 
             # create `obs`
