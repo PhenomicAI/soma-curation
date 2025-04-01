@@ -29,7 +29,6 @@ dependencies = [
     "fast_matrix_market",
     "pydantic",
     "pyyaml",
-    "gitpython",
     "s3fs[boto3]",
     "cloudpathlib"
 ]

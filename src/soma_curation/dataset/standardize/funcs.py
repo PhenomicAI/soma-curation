@@ -94,6 +94,20 @@ def compute_pct_ribo(adata: ad.AnnData) -> npt.NDArray[np.float64]:
     return np.asarray((adata[:, ribo_mask].X.sum(axis=1) / adata.X.sum(axis=1)).flatten() * 100).flatten()
 
 
+def compute_log_mean(adata: ad.AnnData) -> npt.NDArray[np.float32]:
+    logger.info("Computing log mean...")
+    log_counts = np.log(adata.X.sum(axis=1))
+    local_mean = np.mean(log_counts).astype(np.float32)
+    return np.full((adata.X.shape[0],), local_mean)
+
+
+def compute_log_var(adata: ad.AnnData) -> npt.NDArray[np.float32]:
+    logger.info("Computing log var...")
+    log_counts = np.log(adata.X.sum(axis=1))
+    local_var = np.var(log_counts).astype(np.float32)
+    return np.full((adata.X.shape[0],), local_var)
+
+
 def get_main_gene_name_from_2_pd_cols(
     input_genes: pd.DataFrame,
     gene_aliases: pd.DataFrame,
