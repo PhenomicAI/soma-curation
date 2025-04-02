@@ -81,7 +81,7 @@ def main():
     filenames_pkl = AnyPath(pc.filenames_pickle)
 
     if filenames_pkl.is_file():
-        logger.info(f"Found existing filenames pickle at {filenames_pkl}. Skipping H5AD conversion.")
+        logger.info(f"Found existing filenames pickle at {str(filenames_pkl)}. Skipping H5AD conversion.")
         with open(filenames_pkl, "rb") as f:
             filenames = pickle.load(f)
     else:
@@ -114,14 +114,14 @@ def main():
         # Save the successfully converted filenames to pickle
         with filenames_pkl.open("wb") as f:
             pickle.dump(filenames, f)
-        logger.info(f"Filenames saved to {filenames_pkl}.")
+        logger.info(f"Filenames saved to {str(filenames_pkl)}.")
 
     # ---------------------------------------------------------------------
     # STEP (2): Create registration mapping or load from file
     # ---------------------------------------------------------------------
     registration_mapping_pkl = AnyPath(pc.registration_mapping_pickle)
     if registration_mapping_pkl.is_file():
-        logger.info(f"Found existing registration mapping at {registration_mapping_pkl}, skipping creation.")
+        logger.info(f"Found existing registration mapping at {str(registration_mapping_pkl)}, skipping creation.")
         with registration_mapping_pkl.open("rb") as f:
             rm = pickle.load(f)
     else:
@@ -129,7 +129,7 @@ def main():
         rm = create_registration_mapping(experiment_uri=str(am.experiment_path), filenames=filenames)
         with registration_mapping_pkl.open("wb") as f:
             pickle.dump(rm, f)
-        logger.info("Registration mapping created and saved to rm.pkl.")
+        logger.info(f"Registration mapping created and saved to {str(registration_mapping_pkl)}.")
 
     # ---------------------------------------------------------------------
     # STEP (3): Resize the experiment
