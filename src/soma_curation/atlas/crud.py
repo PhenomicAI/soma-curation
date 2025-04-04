@@ -12,6 +12,7 @@ from typing_extensions import Annotated
 from ..schema import DatabaseSchema
 from ..sc_logging import logger
 from ..config.config import SOMA_TileDB_Context
+from ..types.path import ExpandedPath
 
 try:
     from importlib.metadata import version as get_version
@@ -19,15 +20,6 @@ try:
     PACKAGE_VERSION = get_version("soma_curation")
 except Exception:
     PACKAGE_VERSION = "1.0"
-
-
-def expand_paths(value: Union[str, AnyPath]) -> AnyPath:
-    if isinstance(value, str):
-        value = AnyPath(value)
-    return value
-
-
-ExpandedPath = Annotated[Union[str, AnyPath], AfterValidator(expand_paths)]
 
 
 class AtlasManager(BaseModel):

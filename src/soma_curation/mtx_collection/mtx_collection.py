@@ -1,15 +1,15 @@
-from pydantic import BaseModel, field_validator, ConfigDict
-from pathlib import Path
+from pydantic import BaseModel, ConfigDict, model_validator
 import pandas as pd
 import scipy.sparse as sp
 import anndata as ad
 
 from typing import List, Tuple, Optional, Union, Generator
 from fast_matrix_market import mmread
-from cloudpathlib import CloudPath
+from cloudpathlib import AnyPath
 
 from ..schema import DatabaseSchema
 from ..sc_logging import logger
+from ..types.path import ExpandedPath
 
 
 class MtxCollection(BaseModel):
@@ -43,24 +43,35 @@ class MtxCollection(BaseModel):
         _type_: CollectionSpec
     """
 
-    storage_directory: Union[Path, CloudPath]
+    storage_directory: ExpandedPath
     db_schema: DatabaseSchema
     include: Optional[List[str]] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("storage_directory", mode="before")
-    @classmethod
-    def ensure_typing_of_path(cls, raw: str) -> Union[CloudPath, Path]:
-        if raw.startswith("s3://"):
-            path = CloudPath(raw + "/")
-        else:
-            path = Path(raw + "/")
-        assert path.exists(), f"{path} does not exist."
+    @model_validator(mode="after")
+    def check_duplicate_samples(self) -> "MtxCollection":
+        """Validator to ensure no sample names overlap among studies."""
+        sample_to_studies = {}  # Track which studies each sample appears in
 
-        return path
+        for study in self.list_studies():
+            for sample in self.list_samples(study):
+                if sample in sample_to_studies:
+                    sample_to_studies[sample].append(study)
+                    logger.warning(f"Sample '{sample}' appears in studies: {sample_to_studies[sample]}")
+                else:
+                    sample_to_studies[sample] = [study]
 
-    def list_studies(self) -> List[Union[Path, CloudPath]]:
+        duplicate_samples = {sample: studies for sample, studies in sample_to_studies.items() if len(studies) > 1}
+        if duplicate_samples:
+            raise ValueError(
+                f"Found duplicate sample names across studies: {duplicate_samples}. "
+                "Each sample name must be unique across all studies."
+            )
+
+        return self
+
+    def list_studies(self) -> List[str]:
         all_studies = [study_path.parts[-1] for study_path in self.clean_listdir(self.storage_directory)]
 
         if self.include:
@@ -69,7 +80,7 @@ class MtxCollection(BaseModel):
             return filtered_studies
         return all_studies
 
-    def list_samples(self, study_name: str) -> List[Union[Path, CloudPath]]:
+    def list_samples(self, study_name: str) -> List[str]:
         study_path = self.storage_directory / study_name / "mtx"
         return [sample_path.parts[-1] for sample_path in self.clean_listdir(study_path)]
 
@@ -129,24 +140,24 @@ class MtxCollection(BaseModel):
 
     @staticmethod
     def clean_listdir(
-        path: Union[Path, CloudPath], ignore_patterns: List[str] = [".DS_Store", ".log"]
-    ) -> Generator[Union[Path, CloudPath], None, None]:
+        path: AnyPath, ignore_patterns: List[str] = [".DS_Store", ".log"]
+    ) -> Generator[AnyPath, None, None]:
         """
         A generator that yields directory contents, ignoring specific files or patterns.
 
         Args:
-            path (Union[Path, CloudPath]): The directory to list contents from.
+            path (AnyPath): The directory to list contents from.
             ignore_patterns (List[str]): List of patterns to ignore (e.g., ".DS_Store").
 
         Yields:
-            Union[Path, CloudPath]: Valid directory components.
+            AnyPath: Valid directory components.
         """
         for item in path.iterdir():
             if not any(pattern in item.parts[-1] for pattern in ignore_patterns):
                 yield item
 
     def read_mtx(
-        self, root_fp: Union[Path, CloudPath], files: Optional[List[str]] = None
+        self, root_fp: AnyPath, files: Optional[List[str]] = None
     ) -> Tuple[Optional[sp.csr_matrix], Optional[pd.DataFrame], Optional[pd.DataFrame]]:
         matrix, barcodes_df, features_df = None, None, None
         if files is None:
@@ -164,7 +175,7 @@ class MtxCollection(BaseModel):
 
         return matrix, barcodes_df, features_df
 
-    def read_metadata_file(self, fp: Union[Path, CloudPath], reindex_columns: List[str]) -> pd.DataFrame:
+    def read_metadata_file(self, fp: AnyPath, reindex_columns: List[str]) -> pd.DataFrame:
         try:
             metadata_df = self.read_csv(fp, sep="\t")
             metadata_df = metadata_df.reindex(columns=reindex_columns, fill_value="Unknown")
@@ -175,21 +186,21 @@ class MtxCollection(BaseModel):
         return metadata_df
 
     @staticmethod
-    def read_csv(filepath: Union[CloudPath, Path], **kwargs) -> pd.DataFrame:
+    def read_csv(filepath: AnyPath, **kwargs) -> pd.DataFrame:
         # Long form of reading versus supplying path because that's how CloudPath reads are supported
         # Pandas does not support CloudPaths atm
         # This helps eliminate the if-else for s3 versus normal posix paths
         # https://s3pathlib.readthedocs.io/en/latest/03-S3-Write-API.html#Pandas
-        if isinstance(filepath, (CloudPath, Path)):
+        if isinstance(filepath, AnyPath):
             df = pd.read_csv(filepath, **kwargs)
         else:
-            raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib CloudPath or pathlib Path.")
+            raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib AnyPath.")
         return df
 
     @staticmethod
-    def mmread(filepath: Union[CloudPath, Path]) -> sp.csr_matrix:
-        if not isinstance(filepath, (CloudPath, Path)):
-            raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib CloudPath or pathlib Path.")
+    def mmread(filepath: AnyPath) -> sp.csr_matrix:
+        if not isinstance(filepath, AnyPath):
+            raise ValueError("Unsupported filepath type. Filepath needs to be cloudpathlib AnyPath.")
         matrix = mmread(filepath).T.tocsr()
 
         return matrix
