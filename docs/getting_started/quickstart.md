@@ -62,13 +62,18 @@ raw_data/
 ## 3. Create a Collection and Atlas
 
 ```python
-from soma_curation.mtx_collection import MtxCollection
+from soma_curation.collection import MtxCollection, H5adCollection
 from soma_curation.atlas.crud import AtlasManager
 
-# Create a collection to manage raw data
-collection = MtxCollection(
+# Create a collection to manage raw MTX data
+mtx_collection = MtxCollection(
     storage_directory="path/to/raw_data",
     db_schema=schema
+)
+
+# Create a collection to manage H5AD files
+h5ad_collection = H5adCollection(
+    storage_directory="path/to/h5ad_files"
 )
 
 # Create an atlas for processed data
@@ -87,12 +92,16 @@ am.create()
 ```python
 from soma_curation.dataset.anndataset import AnnDataset
 
-# Create and standardize a dataset
+# Create and standardize a dataset from MTX collection
 dataset = AnnDataset(
     atlas_manager=am,
-    collection=collection
+    collection=mtx_collection
 )
 dataset.standardize()
+
+# Or directly use an H5AD file from H5adCollection
+h5ad_filename = h5ad_collection.list_h5ad_files()[0]
+adata = h5ad_collection.get_anndata(filename=h5ad_filename)
 ```
 
 ## 5. Ingest Data into Atlas

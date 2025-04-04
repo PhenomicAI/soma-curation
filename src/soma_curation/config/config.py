@@ -4,7 +4,8 @@ from pydantic import BaseModel, ConfigDict, computed_field
 from functools import lru_cache
 from typing import Optional
 
-from ..mtx_collection.mtx_collection import MtxCollection
+from ..collection.mtx_collection import MtxCollection
+from ..collection.h5ad_collection import H5adCollection
 from ..schema import DatabaseSchema, load_schema
 
 
@@ -59,6 +60,11 @@ class PipelineConfig(BaseModel):
     @property
     def mtx_collection(self) -> MtxCollection:
         return MtxCollection(storage_directory=self.raw_storage_dir, db_schema=self.db_schema)
+
+    @computed_field
+    @property
+    def h5ad_collection(self) -> H5adCollection:
+        return H5adCollection(storage_directory=self.h5ad_storage_dir)
 
 
 # TODO: figure out if LRU cache works in multiprocessing

@@ -68,15 +68,27 @@ raw_data/
 3. Create and use your collection:
 
 ```python
-from soma_curation.mtx_collection import MtxCollection
+from soma_curation.collection import MtxCollection, H5adCollection
 
+# For MTX files
 collection = MtxCollection(
     storage_directory="path/to/raw_data",
     db_schema=schema
 )
 
-# Access AnnDatas
+# Access AnnDatas from MTX files
 adata = collection.get_anndata(study_name="study_1", sample_name="sample_1")
+
+# For H5AD files
+h5ad_collection = H5adCollection(
+    storage_directory="path/to/h5ad_files"
+)
+
+# List all H5AD files
+h5ad_files = h5ad_collection.list_h5ad_files()
+
+# Access AnnData directly from an H5AD file
+adata = h5ad_collection.get_anndata(filename="file1.h5ad")
 ```
 
 4. Create a TileDB-SOMA Experiment

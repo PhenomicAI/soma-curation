@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from src.soma_curation.mtx_collection.mtx_collection import MtxCollection
+from src.soma_curation.collection.mtx_collection import MtxCollection
 from src.soma_curation.schema import load_schema
 from src.soma_curation.constants.create_dummy_structure import create_dummy_structure
 
