@@ -48,13 +48,36 @@ jobs:
       - name: Deploy Documentation (Release)
         if: github.event_name == 'release'
         run: |
-          # Extract version from release tag
+          # Extract version details (with "v" prefix preserved)
           VERSION=${GITHUB_REF#refs/tags/}
+          # Extract major.minor version (e.g., v1.0 from v1.0.0-rc1)
+          # This regex properly handles versions with "v" prefix
+          MAJOR_MINOR=$(echo $VERSION | grep -oE '^v?[0-9]+\.[0-9]+')
 
-          # For pre-releases, just deploy as the version
+          echo "Version: $VERSION"
+          echo "Major.Minor: $MAJOR_MINOR"
+
           if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+            # For pre-releases (v1.0.0-rc, v1.0.0-rc1, etc.):
+            # 1. Deploy with version tag (e.g., v1.0.0-rc1)
+            # 2. Update "next" alias to point to this version
+            # 3. Update the major.minor alias if it doesn't exist yet
+            echo "Deploying pre-release documentation for version $VERSION"
             mike deploy --push $VERSION
-          # For stable releases, deploy as the version and set as latest
+            mike alias --push $VERSION next
+            
+            # Check if major.minor version exists and update it if this is newer
+            if ! mike list | grep -q "^$MAJOR_MINOR"; then
+              echo "Setting $VERSION as default for $MAJOR_MINOR branch"
+              mike alias --push $VERSION $MAJOR_MINOR
+            fi
           else
-            mike deploy --push --update-aliases $VERSION latest
+            # For stable releases (v1.0.0):
+            # 1. Deploy with version tag (e.g., v1.0.0)
+            # 2. Update "latest" alias to point to this version
+            # 3. Update the major.minor alias (e.g., v1.0)
+            echo "Deploying stable release documentation for version $VERSION"
+            mike deploy --push $VERSION
+            mike alias --push $VERSION latest
+            mike alias --push $VERSION $MAJOR_MINOR
           fi
