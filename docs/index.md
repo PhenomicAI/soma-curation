@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # SOMA Curation Documentation
 
 Welcome to the SOMA Curation documentation! This package provides tools for managing and curating single-cell RNA sequencing data using the TileDB-SOMA framework.
@@ -7,28 +13,22 @@ Welcome to the SOMA Curation documentation! This package provides tools for mana
 - [Installation](getting_started/installation.md)
 - [Quick Start Guide](getting_started/quickstart.md)
 - [Basic Concepts](getting_started/concepts.md)
+- [Releases & Versioning](getting_started/releases.md)
 
-## User Guide
+## Usage
 
-- [Schema Definition](user_guide/schema.md)
-- [Data Organization](user_guide/data_organization.md)
-- [Data Ingestion](user_guide/ingestion.md)
-- [Working with Collections](user_guide/collections.md)
-- [Atlas Management](user_guide/atlas.md)
+- [Basic Usage](usage/basics.py)
+- [Data Organization](usage/data_organization.md)
+
+## Advanced
+
+- [Multiprocessing Ingestion](advanced/multiprocessing.md)
 
 ## API Reference
 
-- [Core Modules](api_reference/core.md)
-  - [Schema](api_reference/schema.md)
-  - [Collections](api_reference/collections.md)
-  - [Atlas](api_reference/atlas.md)
-- [Utilities](api_reference/utils.md)
-- [Configuration](api_reference/config.md)
+- [Atlas](api_reference/atlas.md)
+- [Dataset](api_reference/dataset.md)
 
-## Examples
+## Documentation Source
 
-- [Basic Usage](usage/basics.py)
-
-## Support
-
-- [FAQ](support/faq.md)
+This documentation is built using [MkDocs](https://www.mkdocs.org/) with the [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme. The documentation is automatically built and deployed when changes are pushed to the main branch.

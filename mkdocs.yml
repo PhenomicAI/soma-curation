@@ -6,25 +6,39 @@ repo_name: PhenomicAI/soma-curation
 
 theme:
   name: material
+  logo: assets/logo.png
+  favicon: assets/logo.png
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.top
+    - navigation.tracking
+    - navigation.indexes
+    - navigation.instant
     - search.suggest
     - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - header.autohide
   palette:
-    - scheme: default
-      primary: indigo
-      accent: indigo
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: deep purple
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    - scheme: slate
-      primary: indigo
-      accent: indigo
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: deep purple
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
 
 plugins:
   - search
@@ -40,11 +54,10 @@ plugins:
   - git-revision-date-localized:
       enable_creation_date: true
   - mike:
-      # These fields are all optional; the defaults are shown below
-      version_selector: true # Set to false to hide version selector
-      css_dir: css # CSS directory in your input
-      javascript_dir: js # Javascript directory in your input
-      canonical_version: latest # Version to point to when no version specified
+      version_selector: true
+      css_dir: css
+      javascript_dir: js
+      canonical_version: latest
 
 extra:
   version:
@@ -59,6 +72,8 @@ extra:
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
@@ -68,25 +83,24 @@ markdown_extensions:
       alternate_style: true
   - tables
   - footnotes
+  - attr_list
+  - md_in_html
+  - def_list
+  - toc:
+      permalink: true
 
 nav:
-  - Home: index.md
   - Getting Started:
       - Installation: getting_started/installation.md
       - Quick Start: getting_started/quickstart.md
       - Basic Concepts: getting_started/concepts.md
-  - User Guide:
-      - Schema Definition: user_guide/schema.md
-      - Data Organization: user_guide/data_organization.md
-      - Data Ingestion: user_guide/ingestion.md
-      - Working with Collections: user_guide/collections.md
-      - Atlas Management: user_guide/atlas.md
+      - Releases & Versioning: getting_started/releases.md
+  - Usage:
+      - Basics: usage/basics.py
+      - Data Organization: usage/data_organization.md
+      - Appending to an Atlas: usage/append_atlas.md
+  - Advanced:
+      - Multiprocessing Ingestion: advanced/multiprocessing.md
   - API Reference:
-      - Core Modules: api_reference/core.md
-      - Schema: api_reference/schema.md
-      - Collections: api_reference/collections.md
       - Atlas: api_reference/atlas.md
-      - Utilities: api_reference/utils.md
-      - Configuration: api_reference/config.md
-  - Examples:
-      - Basic Usage: usage/basics.py
+      - Dataset: api_reference/dataset.md

@@ -95,6 +95,23 @@ dataset = AnnDataset(
 dataset.standardize()
 ```
 
+## 5. Ingest Data into Atlas
+
+After standardizing your data, you can access the AnnData object and ingest it into your atlas with a single function call from `tiledbsoma.io`:
+
+```python
+import tiledbsoma
+
+# Access the AnnData object from the dataset and ingest it into the atlas
+tiledbsoma.io.from_anndata(
+    experiment_uri=str(am.experiment_path),
+    measurement_name="RNA",
+    anndata=dataset.artifact
+)
+
+print("Data successfully ingested into atlas!")
+```
+
 ### Using Command Line Interface
 
 For large-scale data processing, use the multiprocessing ingestion script:
