@@ -60,6 +60,13 @@ dev = [
     "mkdocs-jupyter",
     "pre-commit"
 ]
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-jupyter",
+    "mkdocs-git-revision-date-localized-plugin",
+    "mike",
+]
 
 [project.urls]
 homepage = "https://phenomic.ai"

@@ -1,6 +1,31 @@
-site_name: Data Curation
+site_name: SOMA Curation
+site_description: Tools for managing and curating single-cell RNA sequencing data using TileDB-SOMA
+site_url: https://phenomicai.github.io/soma-curation
+repo_url: https://github.com/PhenomicAI/soma-curation
+repo_name: PhenomicAI/soma-curation
+
 theme:
   name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
 plugins:
   - search
   - mkdocstrings:
@@ -8,12 +33,70 @@ plugins:
         python:
           options:
             show_source: false
+            show_root_heading: true
+            heading_level: 2
   - mkdocs-jupyter:
       execute: false
+  - git-revision-date-localized:
+      enable_creation_date: true
+  - mike:
+      # These fields are all optional; the defaults are shown below
+      version_selector: true # Set to false to hide version selector
+      css_dir: css # CSS directory in your input
+      javascript_dir: js # Javascript directory in your input
+      canonical_version: latest # Version to point to when no version specified
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PhenomicAI/soma-curation
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/soma-curation
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - footnotes
+
 nav:
   - Home: index.md
-  - Usage:
-      - Getting Started: usage/basics.py
+  - Getting Started:
+      - Installation: getting_started/installation.md
+      - Quick Start: getting_started/quickstart.md
+      - Basic Concepts: getting_started/concepts.md
+  - User Guide:
+      - Schema Definition: user_guide/schema.md
+      - Data Organization: user_guide/data_organization.md
+      - Data Ingestion: user_guide/ingestion.md
+      - Working with Collections: user_guide/collections.md
+      - Atlas Management: user_guide/atlas.md
   - API Reference:
+      - Core Modules: api_reference/core.md
+      - Schema: api_reference/schema.md
+      - Collections: api_reference/collections.md
       - Atlas: api_reference/atlas.md
-      - Dataset: api_reference/dataset.md
+      - Utilities: api_reference/utils.md
+      - Configuration: api_reference/config.md
+  - Examples:
+      - Basic Usage: examples/basic_usage.md
+      - Advanced Scenarios: examples/advanced.md
+      - Troubleshooting: examples/troubleshooting.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Code Style: development/code_style.md
+      - Testing: development/testing.md
+  - Support:
+      - FAQ: support/faq.md
+      - Known Issues: support/known_issues.md
+      - Getting Help: support/getting_help.md
