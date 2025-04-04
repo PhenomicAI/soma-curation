@@ -132,4 +132,3 @@ raw_data/
 
 - Learn about [Schema Definition](user_guide/schema.md)
 - Explore [Data Organization](user_guide/data_organization.md)
-- Check out [Advanced Usage](examples/advanced.md)
