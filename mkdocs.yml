@@ -75,18 +75,9 @@ nav:
       - Installation: getting_started/installation.md
       - Quick Start: getting_started/quickstart.md
       - Basic Concepts: getting_started/concepts.md
-  - User Guide:
-      - Schema Definition: user_guide/schema.md
-      - Data Organization: user_guide/data_organization.md
-      - Data Ingestion: user_guide/ingestion.md
-      - Working with Collections: user_guide/collections.md
-      - Atlas Management: user_guide/atlas.md
+      - Releases & Versioning: getting_started/releases.md
+  - Usage:
+      - Basics: usage/basics.py
   - API Reference:
-      - Core Modules: api_reference/core.md
-      - Schema: api_reference/schema.md
-      - Collections: api_reference/collections.md
       - Atlas: api_reference/atlas.md
-      - Utilities: api_reference/utils.md
-      - Configuration: api_reference/config.md
-  - Examples:
-      - Basic Usage: usage/basics.py
+      - Dataset: api_reference/dataset.md
