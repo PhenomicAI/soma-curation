@@ -10,13 +10,24 @@ Before installing SOMA Curation, ensure you have:
 
 ## Installation Methods
 
-### Using pip
+### Using pip (Stable Release)
 
-The simplest way to install SOMA Curation is using pip:
+The simplest way to install the stable release of SOMA Curation is using pip:
 
 ```bash
 pip install soma-curation
 ```
+
+### Using TestPyPI (Pre-releases)
+
+To install pre-release versions for testing:
+
+```bash
+# Install from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple soma-curation
+```
+
+Pre-releases are published when a GitHub release is marked as a pre-release. These versions may contain new features that are still under development or testing.
 
 ### From Source
 

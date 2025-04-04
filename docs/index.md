@@ -27,18 +27,8 @@ Welcome to the SOMA Curation documentation! This package provides tools for mana
 
 ## Examples
 
-- [Basic Usage](examples/basic_usage.md)
-- [Advanced Scenarios](examples/advanced.md)
-- [Troubleshooting](examples/troubleshooting.md)
-
-## Development
-
-- [Contributing Guide](development/contributing.md)
-- [Code Style](development/code_style.md)
-- [Testing](development/testing.md)
+- [Basic Usage](usage/basics.py)
 
 ## Support
 
 - [FAQ](support/faq.md)
-- [Known Issues](support/known_issues.md)
-- [Getting Help](support/getting_help.md)

@@ -1,8 +1,10 @@
 # SOMA Curation
 
 [![PyPI version](https://badge.fury.io/py/soma-curation.svg)](https://badge.fury.io/py/soma-curation)
-[![Documentation Status](https://phenomicai.github.io/soma-curation/badge/?version=latest)](https://phenomicai.github.io/soma-curation/?badge=latest)
-[![Tests](https://github.com/PhenomicAI/soma-curation/actions/workflows/tests.yml/badge.svg)](https://github.com/PhenomicAI/soma-curation/actions/workflows/tests.yml)
+[![TestPyPI version](https://img.shields.io/badge/TestPyPI-pre--releases-blue)](https://test.pypi.org/project/soma-curation/)
+[![Documentation Status](https://img.shields.io/github/actions/workflow/status/PhenomicAI/soma-curation/docs.yml?label=docs)](https://github.com/PhenomicAI/soma-curation/actions/workflows/docs.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/PhenomicAI/soma-curation/test.yml?label=tests)](https://github.com/PhenomicAI/soma-curation/actions/workflows/test.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/PhenomicAI/soma-curation/build.yml?label=build)](https://github.com/PhenomicAI/soma-curation/actions/workflows/build.yml)
 
 ## Overview
 

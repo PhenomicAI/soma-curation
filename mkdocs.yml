@@ -89,14 +89,4 @@ nav:
       - Utilities: api_reference/utils.md
       - Configuration: api_reference/config.md
   - Examples:
-      - Basic Usage: examples/basic_usage.md
-      - Advanced Scenarios: examples/advanced.md
-      - Troubleshooting: examples/troubleshooting.md
-  - Development:
-      - Contributing: development/contributing.md
-      - Code Style: development/code_style.md
-      - Testing: development/testing.md
-  - Support:
-      - FAQ: support/faq.md
-      - Known Issues: support/known_issues.md
-      - Getting Help: support/getting_help.md
+      - Basic Usage: usage/basics.py

@@ -1,0 +1,83 @@
+name: Documentation
+
+on:
+  workflow_run:
+    workflows: ["Tests"]
+    types:
+      - completed
+    branches:
+      - main
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy_docs:
+    name: Deploy Docs
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'release')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          pip install -e ".[docs]"
+
+      - name: Setup Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Deploy Documentation (Main Branch)
+        if: github.event_name == 'workflow_run'
+        run: |
+          mike deploy --push --update-aliases dev
+
+      - name: Deploy Documentation (Release)
+        if: github.event_name == 'release'
+        run: |
+          # Extract version details (with "v" prefix preserved)
+          VERSION=${GITHUB_REF#refs/tags/}
+          # Extract major.minor version (e.g., v1.0 from v1.0.0-rc1)
+          # This regex properly handles versions with "v" prefix
+          MAJOR_MINOR=$(echo $VERSION | grep -oE '^v?[0-9]+\.[0-9]+')
+
+          echo "Version: $VERSION"
+          echo "Major.Minor: $MAJOR_MINOR"
+
+          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+            # For pre-releases (v1.0.0-rc, v1.0.0-rc1, etc.):
+            # 1. Deploy with version tag (e.g., v1.0.0-rc1)
+            # 2. Update "next" alias to point to this version
+            # 3. Update the major.minor alias if it doesn't exist yet
+            echo "Deploying pre-release documentation for version $VERSION"
+            mike deploy --push $VERSION
+            mike alias --push $VERSION next
+            
+            # Check if major.minor version exists and update it if this is newer
+            if ! mike list | grep -q "^$MAJOR_MINOR"; then
+              echo "Setting $VERSION as default for $MAJOR_MINOR branch"
+              mike alias --push $VERSION $MAJOR_MINOR
+            fi
+          else
+            # For stable releases (v1.0.0):
+            # 1. Deploy with version tag (e.g., v1.0.0)
+            # 2. Update "latest" alias to point to this version
+            # 3. Update the major.minor alias (e.g., v1.0)
+            echo "Deploying stable release documentation for version $VERSION"
+            mike deploy --push $VERSION
+            mike alias --push $VERSION latest
+            mike alias --push $VERSION $MAJOR_MINOR
+          fi
