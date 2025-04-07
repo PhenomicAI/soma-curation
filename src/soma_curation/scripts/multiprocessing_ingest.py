@@ -86,8 +86,8 @@ def main():
             filenames = pickle.load(f)
     else:
         tasks_to_convert = []
-        for study in pc.mtx_collection.list_studies():
-            for sample in pc.mtx_collection.list_samples(study_name=study):
+        for study in pc.collection.list_studies():
+            for sample in pc.collection.list_samples(study_name=study):
                 tasks_to_convert.append((study, sample, pc))
                 logger.info(f"Adding {(study, sample)} to the multiprocessing queue.")
 

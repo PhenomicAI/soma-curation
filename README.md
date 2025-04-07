@@ -68,7 +68,7 @@ raw_data/
 3. Create and use your collection:
 
 ```python
-from soma_curation.collection import MtxCollection, H5adCollection
+from soma_curation.collection import MtxCollection
 
 # For MTX files
 collection = MtxCollection(
