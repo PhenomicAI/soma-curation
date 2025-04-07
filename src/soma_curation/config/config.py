@@ -2,10 +2,10 @@ import tiledbsoma as soma
 
 from pydantic import BaseModel, ConfigDict, computed_field
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Union
+from enum import Enum
 
-from ..collection.mtx_collection import MtxCollection
-from ..collection.h5ad_collection import H5adCollection
+from ..collection import MtxCollection, H5adCollection
 from ..schema import DatabaseSchema, load_schema
 
 
@@ -31,6 +31,11 @@ def SOMA_TileDB_Context() -> soma.options.SOMATileDBContext:
     return soma.options.SOMATileDBContext(tiledb_config=DEFAULT_TILEDB_CONFIG, timestamp=None)
 
 
+class RawCollectionType(str, Enum):
+    MTX = "mtx"
+    H5AD = "h5ad"
+
+
 class PipelineConfig(BaseModel):
     """
     A pipeline configuration object.
@@ -41,6 +46,7 @@ class PipelineConfig(BaseModel):
     raw_storage_dir: str
     atlas_storage_dir: str
     log_dir: str
+    raw_collection_type: RawCollectionType = RawCollectionType.MTX
 
     filenames_pickle: Optional[str] = "filenames.pkl"
     registration_mapping_pickle: Optional[str] = "rm.pkl"
@@ -58,13 +64,11 @@ class PipelineConfig(BaseModel):
 
     @computed_field
     @property
-    def mtx_collection(self) -> MtxCollection:
-        return MtxCollection(storage_directory=self.raw_storage_dir, db_schema=self.db_schema)
-
-    @computed_field
-    @property
-    def h5ad_collection(self) -> H5adCollection:
-        return H5adCollection(storage_directory=self.h5ad_storage_dir)
+    def collection(self) -> Union[MtxCollection, H5adCollection]:
+        if self.raw_collection_type == RawCollectionType.MTX:
+            return MtxCollection(storage_directory=self.raw_storage_dir, db_schema=self.db_schema)
+        else:
+            return H5adCollection(storage_directory=self.raw_storage_dir)
 
 
 # TODO: figure out if LRU cache works in multiprocessing
@@ -76,6 +80,7 @@ def get_pipeline_config(
     atlas_storage_dir: str,
     processes: int = 4,
     db_schema_uri: Optional[str] = None,
+    raw_collection_type: RawCollectionType = RawCollectionType.MTX,
 ) -> PipelineConfig:
     return PipelineConfig(
         atlas_name=atlas_name,
@@ -84,4 +89,5 @@ def get_pipeline_config(
         atlas_storage_dir=atlas_storage_dir,
         processes=processes,
         db_schema_uri=db_schema_uri,
+        raw_collection_type=raw_collection_type,
     )

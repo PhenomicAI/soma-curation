@@ -19,7 +19,7 @@ class DummyResult:
 # Patch the MtxCollection so that list_studies and list_samples return dummy values.
 @pytest.fixture
 def dummy_mtx_collection(monkeypatch):
-    from src.soma_curation.collection.mtx_collection import MtxCollection
+    from src.soma_curation.collection import MtxCollection
 
     monkeypatch.setattr(MtxCollection, "list_studies", lambda self: ["study1"])
     monkeypatch.setattr(MtxCollection, "list_samples", lambda self, study_name: ["sample1"])

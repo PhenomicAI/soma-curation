@@ -77,7 +77,7 @@ def convert_and_std_mtx_to_h5ad(study_name: str, sample_name: str, pc: PipelineC
     """
     try:
         logger.info(f"[convert_to_h5ad] Processing study='{study_name}', sample='{sample_name}'")
-        adata = pc.mtx_collection.get_anndata(study_name=study_name, sample_name=sample_name)
+        adata = pc.collection.get_anndata(study_name=study_name, sample_name=sample_name)
     except Exception as e:
         logger.error(
             f"Error fetching and assembling study='{study_name}', sample='{sample_name}' from raw storage: {e}"
