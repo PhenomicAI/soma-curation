@@ -11,10 +11,11 @@ from ..ingest.ingestion_funcs import (
     ingest_h5ad_soma,
     resize_experiment,
     convert_and_std_mtx_to_h5ad,
+    convert_and_std_h5ad_to_h5ad,
 )
 from ..atlas.crud import AtlasManager
 from ..executor.executors import MultiprocessingExecutor
-from ..config.config import PipelineConfig
+from ..config.config import PipelineConfig, RawCollectionType
 
 if multiprocessing.get_start_method(True) != "spawn":
     multiprocessing.set_start_method("spawn", True)
@@ -45,6 +46,13 @@ def main():
         help="Pickle path for storing/loading registration mapping. "
         "If provided and the file exists, creating the registration mapping is skipped.",
     )
+    parser.add_argument(
+        "--raw-collection-type",
+        type=str,
+        choices=["mtx", "h5ad"],
+        default="mtx",
+        help="Type of collection to process (mtx or h5ad)",
+    )
     args = parser.parse_args()
 
     # 1) Create a pipeline config
@@ -58,6 +66,7 @@ def main():
         log_dir=args.log_dir,
         filenames_pickle=args.filenames_pkl or "filenames.pkl",
         registration_mapping_pickle=args.registration_mapping_pkl or "rm.pkl",
+        raw_collection_type=RawCollectionType(args.raw_collection_type),
     )
 
     # 2) Set up logging. We create a logs directory inside the atlas directory.
@@ -86,10 +95,18 @@ def main():
             filenames = pickle.load(f)
     else:
         tasks_to_convert = []
-        for study in pc.collection.list_studies():
-            for sample in pc.collection.list_samples(study_name=study):
-                tasks_to_convert.append((study, sample, pc))
-                logger.info(f"Adding {(study, sample)} to the multiprocessing queue.")
+        
+        if pc.raw_collection_type == RawCollectionType.MTX:
+            for study in pc.collection.list_studies():
+                for sample in pc.collection.list_samples(study_name=study):
+                    tasks_to_convert.append((study, sample, pc))
+                    logger.info(f"Adding MTX {(study, sample)} to the multiprocessing queue.")
+            conversion_func = convert_and_std_mtx_to_h5ad
+        else:  
+            for h5ad_file in pc.collection.list_h5ad_files():
+                tasks_to_convert.append((h5ad_file, pc))
+                logger.info(f"Adding H5AD file {h5ad_file} to the multiprocessing queue.")
+            conversion_func = convert_and_std_h5ad_to_h5ad
 
         # Create a multiprocessing executor with the specified number of processes
         mp_executor = MultiprocessingExecutor(
@@ -97,8 +114,8 @@ def main():
             init_worker_logging=init_worker_logging,
             init_args=(10, log_dir.as_posix(), f"{pc.atlas_name}.log"),
         )
-        logger.info("Starting parallel conversion to H5AD files...")
-        convert_result = mp_executor.run(tasks_to_convert, convert_and_std_mtx_to_h5ad)
+        logger.info("Starting parallel conversion to standardized H5AD files...")
+        convert_result = mp_executor.run(tasks_to_convert, conversion_func)
 
         # Gather successful conversions for the next step
         filenames = convert_result.successes
