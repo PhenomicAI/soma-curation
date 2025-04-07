@@ -105,6 +105,42 @@ def convert_and_std_mtx_to_h5ad(study_name: str, sample_name: str, pc: PipelineC
         logger.error(f"Error writing study={study_name}, sample={sample_name} to H5AD: {e}")
         raise
 
+# TODO: This is a duplicate of the function above. Might need to refactor.
+def convert_and_std_h5ad_to_h5ad(h5ad_path: str, pc: PipelineConfig):
+    """
+    Function to convert a single H5AD file to a standardized H5AD file.
+    Returns the path to the resulting standardized H5AD file on success.
+    """
+    try:
+        logger.info(f"[convert_to_h5ad] Processing H5AD file: '{h5ad_path}'")
+        adata = pc.collection.get_anndata(h5ad_path)
+    except Exception as e:
+        logger.error(f"Error fetching H5AD file '{h5ad_path}' from storage: {e}")
+        raise
+
+    try:
+        anndataset = AnnDataset(artifact=adata, db_schema=pc.db_schema)
+    except Exception as e:
+        logger.error(f"Error converting '{h5ad_path}' to AnnDataset object: {e}")
+        raise
+
+    try:
+        anndataset.standardize()
+    except Exception as e:
+        logger.error(f"Error standardizing '{h5ad_path}' to H5AD: {e}")
+        raise
+
+    try:
+        # Construct the output filename - keep the original name but in the new directory
+        original_name = Path(h5ad_path).name
+        filename = AnyPath(pc.h5ad_storage_dir) / original_name
+        anndataset.write(filename)
+        logger.info(f"Successfully standardized '{h5ad_path}' -> '{filename}'")
+        return filename.as_posix() if isinstance(filename, Path) else filename.as_uri()
+    except Exception as e:
+        logger.error(f"Error writing standardized H5AD for '{h5ad_path}': {e}")
+        raise
+
 
 def _ingest_h5ad_soma(
     experiment_uri: str,
