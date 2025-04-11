@@ -8,16 +8,7 @@
 
 ## Overview
 
-`soma-curation` is a Python package designed to streamline the curation and management of single-cell RNA sequencing (scRNA-seq) data using the TileDB-SOMA framework. It provides a schema-first approach to data organization, validation, and ingestion, making it easier for bioinformaticians to work with large-scale single-cell datasets.
-
-### Key Features
-
-- **Schema-First Approach**: Define and validate your data structure upfront
-- **Flexible Data Organization**: Support for both local and cloud-based storage
-- **Automated Validation**: Built-in checks for data consistency and integrity
-- **Efficient Data Ingestion**: Streamlined pipeline for converting raw data to SOMA format
-- **Parallel Processing**: Support for multi-process data ingestion
-- **Comprehensive Logging**: Detailed logging for debugging and monitoring
+`soma-curation` is a light-weight Python package used at Phenomic to streamline the curation and management of single-cell RNA sequencing (scRNA-seq) atlases using TileDB-SOMA. It's still in its early stages, but the hope is to allow bioinformaticians and ML practitioners to organize their SOMA atlases and access their raw data a bit better. There are assumptions of raw storage organization baked into the package that mimic practices at Phenomic.
 
 ## Installation
 
