@@ -43,6 +43,7 @@ dependencies = [
 
 [project.scripts]
 pai-soma-curation = "soma_curation.scripts.multiprocessing_ingest:main"
+pai-feature-presence = "soma_curation.scripts.compute_feature_presence:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

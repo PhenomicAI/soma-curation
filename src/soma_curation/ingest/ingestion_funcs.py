@@ -1,13 +1,16 @@
 import tiledbsoma.io
+import tiledbsoma as soma
 
-from typing import List, Literal
+from typing import List, Literal, Union
 from cloudpathlib import AnyPath
 from pathlib import Path
 from tiledbsoma.io import ExperimentAmbientLabelMapping
+import pyarrow as pa
 
 from ..sc_logging import logger
 from ..dataset.anndataset import AnnDataset
 from ..config.config import PipelineConfig, SOMA_TileDB_Context
+from ..collection import MtxCollection, H5adCollection
 
 
 def create_registration_mapping(
@@ -173,3 +176,33 @@ def _ingest_h5ad_soma(
     except Exception as ex:
         logger.error(f"Failed to ingest {h5ad_path}, error: {ex}")
         raise Exception(f"{ex}")
+
+def compute_presence_matrix(
+    sample_idx: int,
+    sample_name: str,
+    study_name: str,
+    collection: Union[MtxCollection, H5adCollection],
+    global_var_list: List[str],
+    pai_presence_matrix_name: str,
+    exp_uri: str,
+):
+    try:
+        logger.info(f"Computing presence matrix for {sample_name}-{study_name}")
+        coo_pm_matrix = collection.presence_matrix(
+            study_name=study_name, sample_name=sample_name, global_var_list=global_var_list
+        )
+        pa_table = pa.Table.from_pydict(
+            {
+                "soma_dim_0": coo_pm_matrix.row + sample_idx,
+                "soma_dim_1": coo_pm_matrix.col,
+                "soma_data": coo_pm_matrix.data,
+            }
+        )
+        with soma.Experiment.open(exp_uri, mode="w") as exp:
+            exp.ms["RNA"][pai_presence_matrix_name].write(pa_table)
+        logger.info(f"Successfully computed presence matrix for {sample_name} {study_name}")
+        return sample_idx
+    except Exception as e:
+        print(e)
+        logger.info(f"Error computing presence matrix for {sample_name} {study_name}: {e}")
+        return None

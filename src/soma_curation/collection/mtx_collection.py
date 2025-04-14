@@ -250,7 +250,7 @@ class MtxCollection(BaseModel):
 
         return merged_obs
 
-    def presence_matrix(self, study_name: str, sample_name: str, global_var_list: List[str]) -> np.ndarray:
+    def presence_matrix(self, study_name: str, sample_name: str, global_var_list: List[str]) -> sp.coo_matrix:
         """Given a list of global features, return a dataframe with the presence of each feature in the study/sample
 
         Args:
@@ -259,15 +259,15 @@ class MtxCollection(BaseModel):
             global_var_list (List[str]): List of global features. The presence matrix is returned in sorted order of this list.
 
         Returns:
-            np.ndarray: Presence matrix with the presence of each feature in the study-sample
+            sp.coo_matrix: Presence matrix with the presence of each feature in the study-sample
         """
         root_fp = self.storage_directory / study_name / "mtx" / sample_name
         _, _, features_df = self.read_mtx(root_fp, files=["features.tsv.gz"])
 
-        presence_matrix = np.zeros((len(global_var_list),))
+        presence_matrix = np.zeros((1, len(global_var_list)))
         feature_set = set(features_df["gene"])
         for i, feature in enumerate(global_var_list):
             if feature in feature_set:
-                presence_matrix[i] = 1
+                presence_matrix[:, i] = 1
 
-        return presence_matrix
+        return sp.coo_matrix(presence_matrix)
