@@ -2,17 +2,57 @@
 import argparse
 import tiledbsoma as soma
 import multiprocessing
+import pandas as pd
+
+from typing import Tuple
 
 from cloudpathlib import AnyPath
 
 from ..collection import MtxCollection, H5adCollection
-from ..schema import load_schema
+from ..schema import load_schema, DatabaseSchema
 from ..executor.executors import MultiprocessingExecutor
 from ..sc_logging import logger, _set_level, init_worker_logging
 from ..ingest.ingestion_funcs import compute_presence_matrix
 
 if multiprocessing.get_start_method(True) != "spawn":
     multiprocessing.set_start_method("spawn", True)
+
+
+def determine_sample_df_to_process(experiment_uri: str, schema: DatabaseSchema) -> Tuple[pd.DataFrame, int]:
+    """
+    Determine which samples need to be processed for feature presence matrix computation and the length of the presence matrix to resize to.
+
+    Args:
+        experiment_uri (str): URI of the experiment
+        schema: Database schema containing PAI_PRESENCE_MATRIX_NAME
+
+    Returns:
+        pd.DataFrame: DataFrame containing sample_name, study_name, and sample_idx for samples that need processing
+        int: The length of the presence matrix to resize to
+    """
+    exp = soma.Experiment.open(experiment_uri)
+    sample_names_df = (
+        exp.obs.read(column_names=["sample_name", "study_name"])
+        .concat()
+        .to_pandas()
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+    sample_names_df["sample_idx"] = sample_names_df["sample_name"].cat.codes
+    resize_length = sample_names_df["sample_idx"].max() + 1
+    logger.info(
+        f"Found {len(sample_names_df)} samples in SOMA experiment, going to resize presence matrix to {resize_length} rows"
+    )
+    last_sample_idx = exp.ms["RNA"][schema.PAI_PRESENCE_MATRIX_NAME].non_empty_domain()[0][1]
+    exp.close()
+
+    if last_sample_idx == 0:
+        logger.info("No samples exist in the presence matrix, retaining all samples")
+        sample_names_df = sample_names_df
+    else:
+        logger.info(f"Considering all sample idxs from {last_sample_idx + 1} to {resize_length - 1}")
+        sample_names_df = sample_names_df[~sample_names_df["sample_idx"].isin(range(last_sample_idx + 1))]
+    return sample_names_df, resize_length
 
 
 def main():
@@ -40,26 +80,11 @@ def main():
 
     global_var_list = schema.SORTED_CORE_GENES
 
-    # Determine samples needed
-    exp = soma.Experiment.open(args.exp_uri)
-    sample_names_df = (
-        exp.obs.read(column_names=["sample_name", "study_name"])
-        .concat()
-        .to_pandas()
-        .drop_duplicates()
-        .reset_index(drop=True)
-    )
-    sample_names_df["sample_idx"] = sample_names_df["sample_name"].cat.codes
-    last_sample_idx = exp.ms["RNA"][schema.PAI_PRESENCE_MATRIX_NAME].non_empty_domain()[0][1]
-    exp.close()
-
-    if last_sample_idx == 0:
-        samples_to_generate_df = sample_names_df
-    else:
-        samples_to_generate_df = sample_names_df[~sample_names_df["sample_idx"].isin(range(last_sample_idx + 1))]
+    logger.info("Determining samples to process...")
+    samples_to_generate_df, resize_length = determine_sample_df_to_process(args.exp_uri, schema)
 
     # Determine what to resize the presence matrix to
-    presence_matrix_shape = (sample_names_df["sample_idx"].max() + 1, len(global_var_list))
+    presence_matrix_shape = (resize_length, len(global_var_list))
     logger.info(f"Resizing presence matrix to {presence_matrix_shape}")
     with soma.Experiment.open(args.exp_uri, mode="w") as exp:
         exp.ms["RNA"][schema.PAI_PRESENCE_MATRIX_NAME].resize(presence_matrix_shape)
@@ -73,6 +98,7 @@ def main():
             samples_to_generate_df["study_name"],
         )
     ]
+    logger.info(f"Running {len(tasks_for_ingestion)} tasks in parallel")
     mp_executor = MultiprocessingExecutor(
         processes=args.n_processes,
         init_worker_logging=init_worker_logging,
@@ -80,7 +106,7 @@ def main():
     )
     ingest_result = mp_executor.run(tasks_for_ingestion, compute_presence_matrix)
     logger.info(
-        "Ingestion complete. {ingest_result.num_successes} successes, " f"{ingest_result.num_failures} failures."
+        f"Ingestion complete. {ingest_result.num_successes} successes, " f"{ingest_result.num_failures} failures."
     )
 
     # If needed, you can decide how to handle the failures

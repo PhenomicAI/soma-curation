@@ -199,7 +199,7 @@ class AnnDataset(BaseModel):
             # Strings and categoricals do not have explicit pandas dtype conversions from Arrow so we have to check the exception
             except Exception as e:
                 dtype = "str"
-                series_ = self.artifact.obs[col].fillna("Unknown").astype(dtype)
+                series_ = self.artifact.obs[col].astype(str).fillna("Unknown").astype(dtype)
 
                 # Categoricals need explicit conversion
                 if isinstance(dtype_, pa.DictionaryType):

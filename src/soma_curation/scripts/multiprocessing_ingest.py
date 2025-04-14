@@ -95,14 +95,14 @@ def main():
             filenames = pickle.load(f)
     else:
         tasks_to_convert = []
-        
+
         if pc.raw_collection_type == RawCollectionType.MTX:
             for study in pc.collection.list_studies():
                 for sample in pc.collection.list_samples(study_name=study):
                     tasks_to_convert.append((study, sample, pc))
                     logger.info(f"Adding MTX {(study, sample)} to the multiprocessing queue.")
             conversion_func = convert_and_std_mtx_to_h5ad
-        else:  
+        else:
             for h5ad_file in pc.collection.list_h5ad_files():
                 tasks_to_convert.append((h5ad_file, pc))
                 logger.info(f"Adding H5AD file {h5ad_file} to the multiprocessing queue.")

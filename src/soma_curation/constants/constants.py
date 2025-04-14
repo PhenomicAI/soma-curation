@@ -22,8 +22,8 @@ def dummy_anndata() -> ad.AnnData:
     obs = pd.DataFrame(
         {
             "barcode": ["cell1", "cell2", "cell3"],
-            "sample_name": ["sample1", "sample1", "sample2"],
-            "study_name": ["study1", "study1", "study2"],
+            "sample_name": ["sample1000", "sample1000", "sample1000"],
+            "study_name": ["study1000", "study1000", "study1000"],
         }
     )
     var = pd.DataFrame({"gene": genes}, index=genes)
