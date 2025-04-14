@@ -2,11 +2,14 @@ import uuid
 import gzip
 from pathlib import Path
 from typing import List, Union
+import anndata.io
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
 from fast_matrix_market import mmwrite
+
+from .constants import dummy_anndata
 
 
 def create_sample_metadata(file_path: Path, study_name: str, sample_names: List[str]):
@@ -122,7 +125,7 @@ def create_test_data_structure(base_path: Path):
         pd.concat(cell_metadata_dfs, axis=0).to_csv(cell_metadata_file, sep="\t", index=False, compression="gzip")
 
 
-def create_dummy_structure(base_path: Union[str, Path]):
+def create_dummy_mtx_structure(base_path: Union[str, Path]) -> Path:
     """
     Create a dummy data structure on disk for testing purposes.
 
@@ -137,3 +140,21 @@ def create_dummy_structure(base_path: Union[str, Path]):
     if isinstance(base_path, str):
         base_path = Path(base_path)
     create_test_data_structure(base_path)
+
+    return base_path
+
+
+def create_dummy_h5ad_structure(base_path: Union[str, Path]) -> Path:
+    """
+    Create a dummy data structure on disk for testing purposes.
+
+    This function wraps the creation of a test data structure (with sample metadata,
+    cell metadata, and H5AD files) under the specified base directory.
+    """
+    if isinstance(base_path, str):
+        base_path = Path(base_path)
+    base_path.mkdir(parents=True, exist_ok=True)
+    adata = dummy_anndata()
+    anndata.io.write_h5ad(str(base_path / "dummy.h5ad"), adata)
+
+    return base_path

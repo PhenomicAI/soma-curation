@@ -1,8 +1,7 @@
 import pytest
-from pathlib import Path
 from src.soma_curation.collection import MtxCollection
 from src.soma_curation.schema import load_schema
-from src.soma_curation.constants.create_dummy_structure import create_dummy_structure
+from src.soma_curation.constants.create_dummy_structure import create_dummy_mtx_structure
 
 
 @pytest.fixture
@@ -17,7 +16,7 @@ def valid_storage_dir(tmp_path):
     storage_dir.mkdir()
 
     # Create a structure with unique sample names across studies
-    create_dummy_structure(storage_dir)
+    create_dummy_mtx_structure(storage_dir)
     return storage_dir
 
 
