@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
-import pandas as pd
 import anndata as ad
+import scipy.sparse as sp
+import numpy as np
 
 from typing import List, Generator, Optional
 from cloudpathlib import AnyPath
@@ -95,3 +96,23 @@ class H5adCollection(BaseModel):
         for item in path.iterdir():
             if not any(pattern in item.parts[-1] for pattern in ignore_patterns):
                 yield item
+
+    def presence_matrix(self, filename: str, global_var_list: List[str]) -> sp.coo_matrix:
+        """Given a list of global features, return a dataframe with the presence of each feature in the study/sample
+
+        Args:
+            filename (str): Name of the H5AD file
+            global_var_list (List[str]): List of global features. The presence matrix is returned in sorted order of this list.
+
+        Returns:
+            sp.coo_matrix: Presence matrix with the presence of each feature in the study-sample
+        """
+        adata = self.get_anndata(filename=filename)
+
+        presence_matrix = np.zeros((1, len(global_var_list)))
+        feature_set = set(adata.var["gene"])
+        for i, feature in enumerate(global_var_list):
+            if feature in feature_set:
+                presence_matrix[:, i] = 1
+
+        return sp.coo_matrix(presence_matrix)

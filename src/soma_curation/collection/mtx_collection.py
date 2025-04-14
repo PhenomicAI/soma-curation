@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 import pandas as pd
 import scipy.sparse as sp
 import anndata as ad
+import numpy as np
 
 from typing import List, Tuple, Optional, Union, Generator
 from fast_matrix_market import mmread
@@ -248,3 +249,25 @@ class MtxCollection(BaseModel):
             raise ValueError("Mismatch in shape of original dataframe and merged dataframe")
 
         return merged_obs
+
+    def presence_matrix(self, study_name: str, sample_name: str, global_var_list: List[str]) -> sp.coo_matrix:
+        """Given a list of global features, return a dataframe with the presence of each feature in the study/sample
+
+        Args:
+            study_name (str): Name of the study
+            sample_name (str): Name of the sample
+            global_var_list (List[str]): List of global features. The presence matrix is returned in sorted order of this list.
+
+        Returns:
+            sp.coo_matrix: Presence matrix with the presence of each feature in the study-sample
+        """
+        root_fp = self.storage_directory / study_name / "mtx" / sample_name
+        _, _, features_df = self.read_mtx(root_fp, files=["features.tsv.gz"])
+
+        presence_matrix = np.zeros((1, len(global_var_list)))
+        feature_set = set(features_df["gene"])
+        for i, feature in enumerate(global_var_list):
+            if feature in feature_set:
+                presence_matrix[:, i] = 1
+
+        return sp.coo_matrix(presence_matrix)
