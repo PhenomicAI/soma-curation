@@ -31,14 +31,24 @@ def determine_sample_df_to_process(experiment_uri: str, schema: DatabaseSchema) 
         int: The length of the presence matrix to resize to
     """
     exp = soma.Experiment.open(experiment_uri)
-    sample_names_df = (
-        exp.obs.read(column_names=["sample_name", "study_name"])
-        .concat()
-        .to_pandas()
-        .drop_duplicates()
-        .reset_index(drop=True)
-    )
-    sample_names_df["sample_idx"] = sample_names_df["sample_name"].cat.codes
+    cols = [c.name for c in exp.obs.schema]
+    if "sample_idx" in cols:
+        sample_names_df = (
+            exp.obs.read(column_names=["sample_name", "study_name", "sample_idx"])
+            .concat()
+            .to_pandas()
+            .drop_duplicates()
+            .reset_index(drop=True)
+        )
+    else:
+        sample_names_df = (
+            exp.obs.read(column_names=["sample_name", "study_name"])
+            .concat()
+            .to_pandas()
+            .drop_duplicates()
+            .reset_index(drop=True)
+        )
+        sample_names_df["sample_idx"] = sample_names_df["sample_name"].cat.codes
     resize_length = sample_names_df["sample_idx"].max() + 1
     logger.info(
         f"Found {len(sample_names_df)} samples in SOMA experiment, going to resize presence matrix to {resize_length} rows"

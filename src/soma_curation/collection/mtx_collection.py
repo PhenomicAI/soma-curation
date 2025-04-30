@@ -74,7 +74,6 @@ class MtxCollection(BaseModel):
 
     def list_studies(self) -> List[str]:
         all_studies = [study_path.parts[-1] for study_path in self.clean_listdir(self.storage_directory)]
-
         if self.include:
             filtered_studies = [study for study in all_studies if study in self.include]
             logger.info(f"Filtered studies using include parameter: {filtered_studies}")

@@ -53,6 +53,13 @@ def main():
         default="mtx",
         help="Type of collection to process (mtx or h5ad)",
     )
+    parser.add_argument(
+        "--include-studies",
+        type=str,
+        nargs="+",
+        default=None,
+        help="List of studies to include. If not provided, all studies will be processed.",
+    )
     args = parser.parse_args()
 
     # 1) Create a pipeline config
@@ -67,6 +74,7 @@ def main():
         filenames_pickle=args.filenames_pkl or "filenames.pkl",
         registration_mapping_pickle=args.registration_mapping_pkl or "rm.pkl",
         raw_collection_type=RawCollectionType(args.raw_collection_type),
+        include_studies=args.include_studies,
     )
 
     # 2) Set up logging. We create a logs directory inside the atlas directory.
@@ -152,7 +160,7 @@ def main():
     # STEP (3): Resize the experiment
     # ---------------------------------------------------------------------
     logger.info("Resizing experiment (serial step)...")
-    resize_experiment(str(am.experiment_path), registration_mapping=rm)
+    rm.prepare_experiment(str(am.experiment_path))
     logger.info("Experiment resized successfully.")
 
     # ---------------------------------------------------------------------
