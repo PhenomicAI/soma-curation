@@ -52,6 +52,7 @@ class PipelineConfig(BaseModel):
     registration_mapping_pickle: Optional[str] = "rm.pkl"
 
     db_schema_uri: Optional[str] = None
+    include_studies: Optional[list[str]] = None
 
     processes: int = 4
 
@@ -66,9 +67,16 @@ class PipelineConfig(BaseModel):
     @property
     def collection(self) -> Union[MtxCollection, H5adCollection]:
         if self.raw_collection_type == RawCollectionType.MTX:
-            return MtxCollection(storage_directory=self.raw_storage_dir, db_schema=self.db_schema)
+            return MtxCollection(
+                storage_directory=self.raw_storage_dir,
+                db_schema=self.db_schema,
+                include=self.include_studies
+            )
         else:
-            return H5adCollection(storage_directory=self.raw_storage_dir)
+            return H5adCollection(
+                storage_directory=self.raw_storage_dir,
+                include=self.include_studies
+            )
 
 
 # TODO: figure out if LRU cache works in multiprocessing
