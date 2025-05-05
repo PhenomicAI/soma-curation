@@ -294,3 +294,32 @@ class MtxCollection(BaseModel):
                 presence_matrix[:, i] = 1
 
         return sp.coo_matrix(presence_matrix)
+
+    def get_all_genes(self) -> List[str]:
+        """Get a list of all unique genes across all studies and samples in the collection.
+        
+        This method reads the features.tsv.gz file from each sample in each study
+        and compiles a unique list of genes.
+        
+        Returns:
+            List[str]: Sorted list of unique genes found in the collection
+        """
+        logger.info("Extracting all unique genes from collection...")
+        all_genes = set()
+        
+        for study in self.list_studies():
+            logger.info(f"Processing study: {study}")
+            for sample in self.list_samples(study):
+                try:
+                    _, _, features_df = self.read_mtx(
+                        self.storage_directory / study / "mtx" / sample,
+                        files=["features.tsv.gz"]
+                    )
+                    all_genes.update(features_df["gene"].tolist())
+                except Exception as e:
+                    logger.warning(f"Failed to read features for {study}/{sample}: {e}")
+                    continue
+        
+        unique_genes = sorted(list(all_genes))
+        logger.info(f"Found {len(unique_genes)} unique genes in collection")
+        return unique_genes
