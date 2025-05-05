@@ -108,13 +108,23 @@ class MtxCollection(BaseModel):
 
         return self.read_mtx(mtx_dir)
 
-    def get_anndata(
+    def get_obs_metadata(
         self, study_name: str, sample_name: str, add_cell_metadata: bool = True, add_sample_metadata: bool = True
-    ) -> ad.AnnData:
-        logger.info(
-            f"Assembling AnnData for study: {study_name}, sample: {sample_name} from {self.storage_directory}..."
-        )
-        mtx, barcodes, features = self.get_mtx(study_name=study_name, sample_name=sample_name)
+    ) -> pd.DataFrame:
+        """Get observation metadata for a study and sample.
+        
+        Args:
+            study_name (str): Name of the study
+            sample_name (str): Name of the sample
+            add_cell_metadata (bool): Whether to add cell-level metadata
+            add_sample_metadata (bool): Whether to add sample-level metadata
+            
+        Returns:
+            pd.DataFrame: DataFrame containing observation metadata
+        """
+        logger.info(f"Getting observation metadata for study: {study_name}, sample: {sample_name}...")
+        _, barcodes, _ = self.get_mtx(study_name=study_name, sample_name=sample_name)
+        
         if add_cell_metadata:
             cell_metadata = self.get_cell_metadata(study_name=study_name)
             barcodes = self.add_metadata_to_df(
@@ -131,11 +141,25 @@ class MtxCollection(BaseModel):
                 join=["sample_name"],
                 columns_to_add=[x[0] for x in self.db_schema.PAI_OBS_SAMPLE_COLUMNS],
             )
-
+            
         barcodes.index = barcodes["barcode"].astype(str)
         barcodes.index.name = "index"
-        anndata = ad.AnnData(X=mtx, obs=barcodes, var=features)
+        return barcodes
 
+    def get_anndata(
+        self, study_name: str, sample_name: str, add_cell_metadata: bool = True, add_sample_metadata: bool = True
+    ) -> ad.AnnData:
+        logger.info(
+            f"Assembling AnnData for study: {study_name}, sample: {sample_name} from {self.storage_directory}..."
+        )
+        mtx, _, features = self.get_mtx(study_name=study_name, sample_name=sample_name)
+        obs = self.get_obs_metadata(
+            study_name=study_name,
+            sample_name=sample_name,
+            add_cell_metadata=add_cell_metadata,
+            add_sample_metadata=add_sample_metadata
+        )
+        anndata = ad.AnnData(X=mtx, obs=obs, var=features)
         return anndata
 
     @staticmethod
