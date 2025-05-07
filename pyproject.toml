@@ -25,7 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "tiledbsoma",
+    "tiledbsoma==1.16.1",
     "fast_matrix_market",
     "pydantic",
     "pyyaml",
