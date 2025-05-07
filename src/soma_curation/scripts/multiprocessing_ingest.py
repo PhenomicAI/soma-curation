@@ -2,6 +2,9 @@ import argparse
 import sys
 import pickle
 import multiprocessing
+import tiledbsoma.logging
+
+from tiledbsoma.io import ExperimentAmbientLabelMapping
 from pathlib import Path
 from cloudpathlib import AnyPath
 
@@ -145,13 +148,14 @@ def main():
     # STEP (2): Create registration mapping or load from file
     # ---------------------------------------------------------------------
     registration_mapping_pkl = AnyPath(pc.registration_mapping_pickle)
+    tiledbsoma.logging.debug()
     if registration_mapping_pkl.is_file():
         logger.info(f"Found existing registration mapping at {str(registration_mapping_pkl)}, skipping creation.")
         with registration_mapping_pkl.open("rb") as f:
             rm = pickle.load(f)
     else:
         logger.info("Creating registration mapping (serial step)...")
-        rm = create_registration_mapping(experiment_uri=str(am.experiment_path), filenames=filenames)
+        rm: ExperimentAmbientLabelMapping = create_registration_mapping(experiment_uri=str(am.experiment_path), filenames=filenames)
         with registration_mapping_pkl.open("wb") as f:
             pickle.dump(rm, f)
         logger.info(f"Registration mapping created and saved to {str(registration_mapping_pkl)}.")
@@ -160,7 +164,7 @@ def main():
     # STEP (3): Resize the experiment
     # ---------------------------------------------------------------------
     logger.info("Resizing experiment (serial step)...")
-    rm.prepare_experiment(str(am.experiment_path))
+    resize_experiment(str(am.experiment_path), registration_mapping=rm)
     logger.info("Experiment resized successfully.")
 
     # ---------------------------------------------------------------------

@@ -25,7 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "tiledbsoma",
+    "tiledbsoma==1.16.1",
     "fast_matrix_market",
     "pydantic",
     "pyyaml",
@@ -44,6 +44,7 @@ dependencies = [
 [project.scripts]
 pai-soma-curation = "soma_curation.scripts.multiprocessing_ingest:main"
 pai-feature-presence = "soma_curation.scripts.compute_feature_presence:main"
+pai-gene-list = "soma_curation.scripts.generate_gene_list:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

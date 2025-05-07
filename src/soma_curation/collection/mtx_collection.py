@@ -37,7 +37,7 @@ class MtxCollection(BaseModel):
 
     Args:
         storage_directory (DirectoryPath): Path to the directory
-        schema (DatabaseSchema): Schema to read from
+        db_schema (Optional[DatabaseSchema]): Schema to read from. Required for metadata operations.
         include (Optional[List[str]]): A list of studies to include. Useful when you want a few studies to be added on
 
     Returns:
@@ -45,7 +45,7 @@ class MtxCollection(BaseModel):
     """
 
     storage_directory: ExpandedPath
-    db_schema: DatabaseSchema
+    db_schema: Optional[DatabaseSchema] = None
     include: Optional[List[str]] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -85,6 +85,13 @@ class MtxCollection(BaseModel):
         return [sample_path.parts[-1] for sample_path in self.clean_listdir(study_path)]
 
     def get_sample_metadata(self, study_name: str) -> pd.DataFrame:
+        """Get sample metadata for a study.
+        
+        Requires db_schema to be set.
+        """
+        if self.db_schema is None:
+            raise ValueError("db_schema must be set to get sample metadata")
+            
         logger.info(f"Reading sample metadata for {study_name} from {self.storage_directory}...")
         sample_metadata_path = self.storage_directory / study_name / "sample_metadata" / f"{study_name}.tsv.gz"
 
@@ -93,6 +100,13 @@ class MtxCollection(BaseModel):
         )
 
     def get_cell_metadata(self, study_name: str) -> pd.DataFrame:
+        """Get cell metadata for a study.
+        
+        Requires db_schema to be set.
+        """
+        if self.db_schema is None:
+            raise ValueError("db_schema must be set to get cell metadata")
+            
         logger.info(f"Reading cell metadata for {study_name} from {self.storage_directory}...")
         cell_metadata_path = self.storage_directory / study_name / "cell_metadata" / f"{study_name}.tsv.gz"
 
@@ -121,7 +135,13 @@ class MtxCollection(BaseModel):
             
         Returns:
             pd.DataFrame: DataFrame containing observation metadata
+            
+        Raises:
+            ValueError: If db_schema is not set and metadata is requested
         """
+        if (add_cell_metadata or add_sample_metadata) and self.db_schema is None:
+            raise ValueError("db_schema must be set to get observation metadata")
+            
         logger.info(f"Getting observation metadata for study: {study_name}, sample: {sample_name}...")
         _, barcodes, _ = self.get_mtx(study_name=study_name, sample_name=sample_name)
         
@@ -149,6 +169,23 @@ class MtxCollection(BaseModel):
     def get_anndata(
         self, study_name: str, sample_name: str, add_cell_metadata: bool = True, add_sample_metadata: bool = True
     ) -> ad.AnnData:
+        """Get an AnnData object for a study and sample.
+        
+        Args:
+            study_name (str): Name of the study
+            sample_name (str): Name of the sample
+            add_cell_metadata (bool): Whether to add cell-level metadata
+            add_sample_metadata (bool): Whether to add sample-level metadata
+            
+        Returns:
+            ad.AnnData: AnnData object containing the data
+            
+        Raises:
+            ValueError: If db_schema is not set and metadata is requested
+        """
+        if (add_cell_metadata or add_sample_metadata) and self.db_schema is None:
+            raise ValueError("db_schema must be set to get AnnData with metadata")
+            
         logger.info(
             f"Assembling AnnData for study: {study_name}, sample: {sample_name} from {self.storage_directory}..."
         )
